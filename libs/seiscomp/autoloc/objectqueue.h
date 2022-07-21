@@ -30,11 +30,11 @@ namespace DataModel {
 class PublicObjectQueue {
 
 	public:
-		bool fill(const EventParameters*);
+		bool fill(const Seiscomp::DataModel::EventParameters*);
 
-		void push(PublicObject *o);
+		void push(Seiscomp::DataModel::PublicObject *o);
 
-		PublicObject* front();
+		Seiscomp::DataModel::PublicObject* front();
 
 		void pop();
 
@@ -43,7 +43,7 @@ class PublicObjectQueue {
 		size_t size() const;
 
 	private:
-		std::queue<PublicObjectPtr> q;
+		std::queue<Seiscomp::DataModel::PublicObjectPtr> q;
 };
 
 

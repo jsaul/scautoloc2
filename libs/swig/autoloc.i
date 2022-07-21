@@ -55,7 +55,7 @@ namespace std {
 import seiscomp.datamodel
 %}
 
-%extend Seiscomp::Autoloc::PublicObjectQueue {
+%extend Seiscomp::DataModel::PublicObjectQueue {
   %pythoncode %{
     def __iter__ (self):
         return self
