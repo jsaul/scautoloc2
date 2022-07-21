@@ -30,16 +30,22 @@ However, the ultimate goal is to replace `scautoloc` by
 
 # Build
 
-The repository cannot be built standalone. It needs to be integrated
-into the `seiscomp` build environment and checked out into
-`src/base/main`.
+Note that `scautoloc2` is not part of any distribution. In order to
+use it, you need to build SeisComP from source.
+
+The `scautoloc2` repository cannot be built standalone. It needs to
+be integrated into the `seiscomp` build environment and checked out
+into `src/extra`.
 
 ```
-$ git clone [host]/seiscomp.git
-$ cd seiscomp/src/base
-$ git clone [host]/main.git
+$ cd seiscomp/src/extra
+$ git clone https://github.com/jsaul/scautoloc2.git
+$ cd ../../build
+$ cmake ..
 ```
 
+This should be enough for `scautoloc2` to be build along with the
+rest of SeisComP.
 
 ## Configuration
 
