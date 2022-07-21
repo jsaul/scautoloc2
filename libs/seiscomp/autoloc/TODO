@@ -1,0 +1,40 @@
+Autoloc3::_associate() in case of manual/trusted origins
+
+_associate() takes one origin and one picks and associates the pick
+to the origin. That's fine in an incremental flow. But for
+manual/trusted origins it is usually a waste of relocator calls and
+we also risk run-away effects. We can instead associate all matching
+picks at once and relocate afterwards, optimize etc.
+
+
+
+
+useImportedOrigins and missing picks
+
+If option useImportedOrigins is active, we currently run into trouble
+if the imported origin refers to picks that we don't have. This must
+be prevented.
+
+This problem can arise if an origin is imported from an agency that
+uses different network codes. Or if we don't import the picks along
+with the origin.
+
+Also may happen if we use a repicker that repicks only parts of the
+picks of an origin and then we mix picks of different authors, but
+autoloc does not allow picks from all these authors. Etcpp.
+
+We need to deal with the situation that we don't have all picks for
+an origin. We need to make sure that we don't attempt to "repair"
+configuration errors. We only concentrate on cases that make sense;
+others need to be rejected.
+
+
+
+
+Need to reimplement Autoloc::_report()
+
+Autoloc::_report() needs to be reimplemented in order to do
+something useful with the generated origins. There is a default
+implementation of Autoloc::_report() that does nothing but this is
+only because making it purely virtual won't work with SWIG. There
+are probably better ways to implement this.
