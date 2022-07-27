@@ -34,18 +34,34 @@ Note that `scautoloc2` is not part of any distribution. In order to
 use it, you need to build SeisComP from source.
 
 The `scautoloc2` repository cannot be built standalone. It needs to
-be integrated into the `seiscomp` build environment and checked out
-into `src/extra`.
+be integrated into the `seiscomp` build environment and cloned
+into `src/extras`.
 
 ```
-$ cd seiscomp/src/extra
+$ cd seiscomp/src/extras
 $ git clone https://github.com/jsaul/scautoloc2.git
-$ cd ../../build
-$ cmake ..
 ```
 
-This should be enough for `scautoloc2` to be build along with the
-rest of SeisComP.
+After cloning the SWIG Python wrappers must be built. This obviously requires SWIG and it is recommended to use the latest version.
+
+```
+$ cd scautoloc2/libs/swig
+$ ./swig-compile.sh
+$ cd ../../..
+```
+
+Finally the `scautoloc2` package is built along with the rest of
+SeisComP:
+
+```
+$ cd ../../build
+$ pwd
+# You should now be in seiscomp/build
+$ cmake ..
+$ make install
+```
+
+This should be all.
 
 ## Configuration
 
