@@ -106,6 +106,16 @@ class Autoloc3 {
 		void setProcessingEnabled(bool yesno=true);
 		bool isProcessingEnabled() const;
 
+
+		// Return true if the origin is trusted in the sense that we
+		// want to use this origin in the processing. In other words
+		// is must be either
+		//  * imported from a trusted external source or
+		//  * an internal, manual origin
+		// and the processing for this type of origin must be enabled.
+		bool isTrustedOrigin(const Seiscomp::DataModel::Origin*) const;
+
+
 		// Feed an external or manual Origin
 		// TODO: Ensure that all needed picks/amplitudes have
 		//       been supplied *prior* to calling this.

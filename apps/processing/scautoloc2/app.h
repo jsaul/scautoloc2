@@ -138,7 +138,7 @@ class AutolocApp :
 
 	private:
 		std::string _inputFileXML; // for XML playback
-		std::string _inputEPFile; // for offline processing
+		std::string _inputFileEP;  // for offline processing
 		std::string _stationLocationFile;
 
 		// object queue used for XML playback

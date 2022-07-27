@@ -97,7 +97,7 @@ void AutolocApp::createCommandLineDescription() {
 		"Input", "ep",
 		"Event parameters XML file for offline processing of all "
 		"contained picks and amplitudes",
-		&_inputEPFile, false);
+		&_inputFileEP, false);
 
 	commandline().addGroup("Settings");
 	commandline().addOption(
@@ -247,7 +247,7 @@ bool AutolocApp::validateParameters()
 	else
 		_config.offline = false;
 
-	if ( !_inputEPFile.empty() ) {
+	if ( !_inputFileEP.empty() ) {
 		_config.playback = true;
 		_config.offline = true;
 	}
@@ -719,7 +719,7 @@ bool AutolocApp::init()
 	}
 
 	if ( _config.playback ) {
-		if ( _inputEPFile.empty() ) {
+		if ( _inputFileEP.empty() ) {
 			// XML playback, set timer to 1 sec
 			SEISCOMP_DEBUG("Playback mode - enable timer of 1 sec");
 			enableTimer(1);
@@ -993,8 +993,8 @@ bool AutolocApp::runFromEPFile(const char *fname)
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 bool AutolocApp::run()
 {
-	if ( ! _inputEPFile.empty() )
-		return runFromEPFile(_inputEPFile.c_str());
+	if ( ! _inputFileEP.empty() )
+		return runFromEPFile(_inputFileEP.c_str());
 
 	// XML playback: first fill object queue, then run()
 	if ( _config.playback && _inputFileXML.size() > 0) {
@@ -1331,7 +1331,7 @@ bool AutolocApp::feed(Seiscomp::DataModel::Amplitude *scampl)
 {
 	const std::string &amplID = scampl->publicID();
 
-	if (_inputFileXML.size() || _inputEPFile.size()) {
+	if (_inputFileXML.size() || _inputFileEP.size()) {
 		try {
 			const Core::Time &creationTime =
 				scampl->creationInfo().creationTime();
@@ -1369,6 +1369,17 @@ bool AutolocApp::feed(Seiscomp::DataModel::Origin *scorigin)
 		return false;
 	}
 
+	if ( isAgencyIDBlocked(objectAgencyID(scorigin)) ) {
+		SEISCOMP_INFO_S(
+			"Ignored origin from " +
+			objectAgencyID(scorigin) + " because "
+			"this agency ID is blocked");
+		return false;
+	}
+
+	if ( ! Autoloc::Autoloc3::isTrustedOrigin(scorigin) )
+		return false;
+
 	SEISCOMP_INFO(
 		"got %s origin %s  agency: %s",
 		manual(scorigin) ? "manual" : "automatic",
@@ -1377,54 +1388,12 @@ bool AutolocApp::feed(Seiscomp::DataModel::Origin *scorigin)
 
 	const bool ownOrigin = objectAgencyID(scorigin) == _config.agencyID;
 
-	if ( ownOrigin ) {
-		if ( manual(scorigin) ) {
-			if ( ! _config.useManualOrigins ) {
-				SEISCOMP_INFO_S(
-					"Ignored origin from " +
-					objectAgencyID(scorigin) + " because "
-					"autoloc.useManualOrigins = false");
-				return false;
-			}
-		}
-		else {
-			// own origin which is not manual -> ignore
-			SEISCOMP_INFO_S(
-				"Ignored origin from " +
-				objectAgencyID(scorigin) + " because "
-				"not a manual origin");
-			return false;
-		}
-	}
-	else {
-		// imported origin
-
-		if ( ! _config.useImportedOrigins ) {
-			SEISCOMP_INFO_S(
-				"Ignored origin from " +
-				objectAgencyID(scorigin) + " because "
-				"autoloc.useImportedOrigins = false");
-			return false;
-		}
-
-		if ( isAgencyIDBlocked(objectAgencyID(scorigin)) ) {
-			SEISCOMP_INFO_S(
-				"Ignored origin from " +
-				objectAgencyID(scorigin) + " because "
-				"this agency ID is blocked");
-			return false;
-		}
-	}
-
-	// At this point we know that the origin is either
-	//  * imported from a trusted external source or
-	//  * an internal, manual origin
-
 	if (ownOrigin) {
-		// TODO:
-		// Make sure that all picks required for processing
-		// the origin are available before feeding the origin to
-		// Autoloc.
+		// Collect all picks required for processing the origin
+		// before feeding it to Autoloc.
+
+		// This may need access to the database and is therefore
+		// in the application class.
 
 		std::vector<PickAmplitudeSet> pa;
 		loadPicksAndAmplitudesForOrigin(scorigin, pa);
@@ -1432,7 +1401,7 @@ bool AutolocApp::feed(Seiscomp::DataModel::Origin *scorigin)
 		bool wasProcessingEnabled =
 			Autoloc::Autoloc3::isProcessingEnabled();
 		Autoloc::Autoloc3::setProcessingEnabled(false);
-		for (PickAmplitudeSet &s : pa) {
+		for (PickAmplitudeSet &s: pa) {
 			Autoloc::Autoloc3::feed(s.pick.get());
 			Autoloc::Autoloc3::feed(s.amplitudeSNR.get());
 			Autoloc::Autoloc3::feed(s.amplitudeAbs.get());
@@ -1473,7 +1442,7 @@ bool AutolocApp::_report(Seiscomp::DataModel::Origin *scorigin)
 			scorigin->publicID().c_str());
 
 		// global EventParameters instance
-		if (ep)
+		if ( ! _inputFileEP.empty())
 			ep->add(scorigin);
 
 		return true;

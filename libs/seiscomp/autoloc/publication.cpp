@@ -153,11 +153,16 @@ void Autoloc3::report()
 
 			if (dt < 0) {
 				_nextDue[id] = 0;
-				SEISCOMP_INFO("Autoloc3::_flush() origin=%ld  next due IMMEDIATELY", id);
+				SEISCOMP_INFO(
+					"Autoloc3::_flush() origin=%ld  "
+					"next due IMMEDIATELY", id);
 			}
 			else {
 				_nextDue[id] = t + dt;
-				SEISCOMP_INFO("Autoloc3::_flush() origin=%ld  next due: %s", id, time2str(_nextDue[id]).c_str());
+				SEISCOMP_INFO(
+					"Autoloc3::_flush() origin=%ld  "
+					"next due: %s", id,
+					time2str(_nextDue[id]).c_str());
 			}
 
 			// save a copy of the origin

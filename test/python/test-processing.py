@@ -44,6 +44,10 @@ class App(seiscomp.client.Application):
         # The Autoloc config
         config = seiscomp.autoloc.Config()
         config.gridConfigFile = os.path.join(eventID, "config", "grid.conf")
+        config.useManualOrigins = True
+        config.useImportedOrigins = True
+        config.pickLogEnable = True
+        config.pickLogFile = "pick.log"
         autoloc.setConfig(config)
 
         if not autoloc.init():
@@ -65,10 +69,12 @@ class App(seiscomp.client.Application):
         return True
 
 
-def main():
-    app = App(len(sys.argv), sys.argv)
+def test_app():
+    # argv = sys.argv
+    argv = [sys.argv[0], "--debug", "--event", "gfz2022oogo"]
+    app = App(len(argv), argv)
     return app()
 
 
 if __name__ == "__main__":
-    main()
+    test_app()

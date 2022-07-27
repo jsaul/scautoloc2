@@ -95,7 +95,7 @@ bool Autoloc3::init()
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 void Autoloc3::dumpState() const
 {
-	for (const Autoloc::DataModel::OriginPtr origin : _origins)
+	for (const Autoloc::DataModel::OriginPtr &origin : _origins)
 		SEISCOMP_INFO_S(printOneliner(origin.get()));
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -282,29 +282,31 @@ bool Autoloc3::feed(const Seiscomp::DataModel::Amplitude *scampl)
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool Autoloc3::feed(Seiscomp::DataModel::Origin *scorigin)
+bool Autoloc3::isTrustedOrigin(const Seiscomp::DataModel::Origin *scorigin) const
 {
-	// The origin MUST be either
-	//  * imported from a trusted external source or
-	//  * an internal, manual origin
-	// This is not checked and must be checked beforehand!
+	if ( ! scorigin ) {
+		SEISCOMP_ERROR("This should never happen: origin is null");
+		return false;
+	}
 
 	bool ownOrigin = objectAgencyID(scorigin) == _config.agencyID;
 
 	if ( ownOrigin ) {
 		if ( manual(scorigin) ) {
 			if ( ! _config.useManualOrigins ) {
-				SEISCOMP_INFO_S("Ignored origin from " +
-						objectAgencyID(scorigin) +
-						" because autoloc.useManualOrigins = false");
+				SEISCOMP_INFO_S(
+					"Ignored origin from " +
+					objectAgencyID(scorigin) + " because "
+					"autoloc.useManualOrigins = false");
 				return false;
 			}
 		}
 		else {
 			// own origin which is not manual -> ignore
-			SEISCOMP_INFO_S("Ignored origin from " +
-					objectAgencyID(scorigin) +
-					" because not a manual origin");
+			SEISCOMP_INFO_S(
+				"Ignored origin from " +
+				objectAgencyID(scorigin) + " because "
+				" not a manual origin");
 			return false;
 		}
 	}
@@ -312,22 +314,45 @@ bool Autoloc3::feed(Seiscomp::DataModel::Origin *scorigin)
 		// imported origin
 
 		if ( ! _config.useImportedOrigins ) {
-			SEISCOMP_INFO_S("Ignored origin from " +
-				objectAgencyID(scorigin) +
-				" because autoloc.useImportedOrigins = false");
+			SEISCOMP_INFO_S(
+				"Ignored origin from " +
+				objectAgencyID(scorigin) + " because "
+				" autoloc.useImportedOrigins = false");
 			return false;
 		}
 
-/* TODO! Currently this filtering takes place in the application class
+// TODO! Currently this filtering takes place in the application class
+/*
 		if ( isAgencyIDBlocked(objectAgencyID(scorigin)) ) {
 			SEISCOMP_INFO_S("Ignored origin from " +
-				objectAgencyID(scorigin) +
-				" due to blocked agency ID");
+				objectAgencyID(scorigin) + " because "
+				"this agency ID is blocked");
 			return false;
 		}
 */
 	}
 
+	// At this point we know that the origin is either
+	//  * imported from a trusted external source or
+	//  * an internal, manual origin
+
+	return true;
+}
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool Autoloc3::feed(Seiscomp::DataModel::Origin *scorigin)
+{
+	// The origin MUST be either
+	//  * imported from a trusted external source or
+	//  * an internal, manual origin
+	// This is not checked and must be checked beforehand!
+
+	if ( ! isTrustedOrigin(scorigin) )
+		return false;
 
 	// Curently, importFromSC may require database access if certain
 	// picks/amplitudes are missing. TODO: This should be avoided and all
@@ -782,9 +807,6 @@ bool Autoloc3::_tooManyRecentPicks(const Autoloc::DataModel::Pick *newPick) cons
 		if (dt < 0 || dt > timeSpan)
 			continue;
 
-/*		if ( newPick->origin() )  // associated?
-			continue;
-*/
 		double snr = oldPick->snr;
 		if (snr > 15)  snr = 15;
 		if (snr <  3)  snr =  3;
@@ -793,7 +815,8 @@ bool Autoloc3::_tooManyRecentPicks(const Autoloc::DataModel::Pick *newPick) cons
 
 		// not well tested:
 		double x = snr * (1-dt/_config.xxlDeadTime);
-		if (x>prevThreshold) prevThreshold = x;
+		if (x > prevThreshold)
+			prevThreshold = x;
 	}
 
 	// These criteria mean that if within the time span there
@@ -959,7 +982,7 @@ bool Autoloc3::_perhapsPdiff(const Autoloc::DataModel::Pick *pick) const
 
 	bool result = false;
 
-	for (const OriginPtr origin : _origins) {
+	for (const OriginPtr &origin : _origins) {
 		const Station *station = pick->station();
 
 		if (pick->time - origin->time >  1000)
@@ -2739,7 +2762,7 @@ double Autoloc3::_testFake(Autoloc::DataModel::Origin *origin) const
 	double maxProbability = 0;
 	int arrivalCount = origin->arrivals.size();
 
-	for (const OriginPtr otherOrigin : _origins) {
+	for (const OriginPtr &otherOrigin : _origins) {
 		int count = 0;
 
 		// First very crude checks
