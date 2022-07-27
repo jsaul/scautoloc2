@@ -27,9 +27,17 @@ namespace Seiscomp {
 
 namespace DataModel {
 
+// PublicObjectQueue
+//
+// Queue of PublicObject's to be used for playbacks.
+
 class PublicObjectQueue {
 
 	public:
+		// Fill the queue with the PublicObjects taken from
+		// the specified EventParameters instance. Objects
+		// are sorted according to creation time, with the oldest
+		// objects at the front.
 		bool fill(const Seiscomp::DataModel::EventParameters*);
 
 		void push(Seiscomp::DataModel::PublicObject *o);

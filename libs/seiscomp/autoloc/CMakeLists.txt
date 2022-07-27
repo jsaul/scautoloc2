@@ -3,9 +3,11 @@ SET(LIBAUTOLOC_SOURCES
 	autoloc.cpp
 	config.cpp
 	datamodel.cpp
+	import.cpp
 	locator.cpp
 	nucleator.cpp
 	objectqueue.cpp
+	publication.cpp
 	sc3adapters.cpp
 	stationconfig.cpp
 	stationlocationfile.cpp

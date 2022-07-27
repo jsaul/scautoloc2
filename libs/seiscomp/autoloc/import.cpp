@@ -117,6 +117,8 @@ Autoloc3::importFromSC(
 		// If the pick pool failed, we try the database
 		// TODO: Use Cache here!
 		if ( ! pick ) {
+SEISCOMP_ERROR("CODE TEMPORARILY COMMENTED OUT");
+/*
 			Seiscomp::DataModel::PickPtr scpick =
 				loadPick(pickID);
 			Seiscomp::DataModel::AmplitudePtr scamplAbs =
@@ -148,6 +150,7 @@ Autoloc3::importFromSC(
 				if (pick)
 					SEISCOMP_INFO_S("Pick " + pickID + " loaded from database");
 			}
+*/
 		}
 
 		if ( ! pick ) {

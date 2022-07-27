@@ -93,27 +93,35 @@ class Autoloc3 {
 
 		// public object input interface
 
-		// Feed a Pick and eventually process it.
+		// Feed a Pick/Amplitude and eventually process it.
 		//
-		// If this pick resulted in a new or updated result,
+		// If the call resulted in a new or updated result,
 		// return true, otherwise false.
-		bool feed(Seiscomp::DataModel::Pick*);
+		bool feed(const Seiscomp::DataModel::Pick*);
+		bool feed(const Seiscomp::DataModel::Amplitude*);
 
-		bool feed(Seiscomp::DataModel::Amplitude*);
+		// Enable/disable immediate processing of picks/amplitudes.
+		// If processing is disabled, then new picks/amplitudes are
+		// only stored, not used to trigger generation of new origins.
+		void setProcessingEnabled(bool yesno=true);
+		bool isProcessingEnabled() const;
 
 		// Feed an external or manual Origin
+		// TODO: Ensure that all needed picks/amplitudes have
+		//       been supplied *prior* to calling this.
 		bool feed(Seiscomp::DataModel::Origin*);
 
-		// After the station config has changed we need to reconfigure
-		// all already configured stations.
+		// After the station config has changed we need to
+		// reconfigure all already configured stations.
 		bool reconfigureStations();
 
+/*
 		virtual Seiscomp::DataModel::Pick* loadPick(
 			const std::string &pickID) = 0;
 		virtual Seiscomp::DataModel::Amplitude* loadAmplitude(
 			const std::string &pickID,
 			const std::string &amplitudeType) = 0;
-
+*/
 	private:
 		// Runtime initialization.
 
@@ -135,7 +143,14 @@ class Autoloc3 {
 		// TODO: NOT IMPLEMENTED YET
 		bool feed(const Autoloc::DataModel::PickGroup&);
 
-		bool feed(Autoloc::DataModel::Origin*);
+		// Feed a trusted origin.
+		//
+		// A trusted origin is either
+		//  * imported from a trusted external source or
+		//  * an internal, manual origin
+		// Trusted origins are used e.g. to fix source depth and/or
+		// the pick weight.
+		bool feed(Autoloc::DataModel::Origin *trustedOrigin);
 
 	protected:
 		// Report all new origins and thereafter empty _newOrigins.
@@ -182,13 +197,10 @@ class Autoloc3 {
 		int _authorPriority(const std::string &author) const;
 
 	private:
+		// Import a Seiscomp::DataModel::Origin
 		//
-		// tool box
-		//
-
-		// import from Seiscomp::DataModel
 		Autoloc::DataModel::Origin *importFromSC(
-			const Seiscomp::DataModel::Origin*);
+			const Seiscomp::DataModel::Origin *trustedOrigin);
 
 		// Compute the score.
 		double _score(const Autoloc::DataModel::Origin*) const;
@@ -397,6 +409,7 @@ class Autoloc3 {
 		Locator    _relocator;
 
 		// origins waiting for a _flush()
+		// TODO: int -> Autoloc::DataModel::OriginID
 		std::map<int, Autoloc::DataModel::Time>      _nextDue;
 		std::map<int, Autoloc::DataModel::OriginPtr> _lastSent;
 		std::map<int, Autoloc::DataModel::OriginPtr> _outgoing;
@@ -426,6 +439,8 @@ class Autoloc3 {
 		std::string   _pickLogFilePrefix;
 		std::string   _pickLogFileName;
 		std::ofstream _pickLogFile;
+
+		bool processingEnabled;
 };
 
 

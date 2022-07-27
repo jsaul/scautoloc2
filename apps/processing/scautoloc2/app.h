@@ -34,6 +34,35 @@ namespace Seiscomp {
 namespace Applications {
 
 
+// PickAmplitudeSet
+//
+// A single set of pick/amplitude objects forming the input data of Autoloc.
+
+class PickAmplitudeSet {
+	public:
+		PickAmplitudeSet(
+			const Seiscomp::DataModel::Pick *_pick,
+			const Seiscomp::DataModel::Amplitude *_amplitudeSNR,
+			const Seiscomp::DataModel::Amplitude *_amplitudeAbs)
+		{
+			pick = _pick;
+			amplitudeSNR = _amplitudeSNR;
+			amplitudeAbs = _amplitudeAbs;
+		}
+
+		Seiscomp::DataModel::PickCPtr pick;
+		Seiscomp::DataModel::AmplitudeCPtr amplitudeSNR;
+		Seiscomp::DataModel::AmplitudeCPtr amplitudeAbs;
+};
+
+/*
+class PickAmplitudeBuffer {
+	PickAmplitudeBuffer(
+		Seiscomp::DataModel::DatabaseArchive *ar,
+		size_t bufferSize);
+};
+*/
+
 class AutolocApp :
 	public Client::Application,
 	// Derived from Autoloc3 mainly because we re-implement here
@@ -45,24 +74,29 @@ class AutolocApp :
 		~AutolocApp();
 
 	private:
-		// startup
+		// Startup
 		void createCommandLineDescription();
 		bool validateParameters();
 		bool initConfiguration();
 		bool initInventory();
 
-		// Read past events from database.
-		void readPastEvents();
-		void readPicksForOrigin(const Seiscomp::DataModel::Origin*);
-
-		bool runFromXMLFile(const char *fname);
-		bool runFromEPFile(const char *fname);
-
 		bool init();
 		bool run();
 
 	private:
-		// processing
+		// Read past events from database.
+		void readPastEvents();
+
+		// Read picks and corresponding amplitudes from database.
+		void readPicksForOrigin(const Seiscomp::DataModel::Origin*);
+
+	private:
+		// Playback
+		bool runFromXMLFile(const char *fname);
+		bool runFromEPFile(const char *fname);
+
+	private:
+		// Processing
 		bool feed(DataModel::Pick*);
 		bool feed(DataModel::Amplitude*);
 		bool feed(DataModel::Origin*);
@@ -71,7 +105,8 @@ class AutolocApp :
 		void addObject(
 			const std::string& parentID,
 			DataModel::Object*);
-		// // These may need to be implemented in future:
+
+		// // These may be needed in future:
 		// void updateObject(
 		// 	const std::string& parentID,
 		// 	DataModel::Object*);
@@ -91,6 +126,10 @@ class AutolocApp :
 		virtual DataModel::Amplitude* loadAmplitude(
 			const std::string &pickID,
 			const std::string &amplitudeType);
+
+		size_t loadPicksAndAmplitudesForOrigin(
+			const Seiscomp::DataModel::Origin *scorigin,
+			std::vector<PickAmplitudeSet> &pa);
 
 	private:
 		// shutdown

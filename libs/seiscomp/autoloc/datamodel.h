@@ -103,8 +103,8 @@ class Pick : public Seiscomp::Core::BaseObject {
 		void setStation(const Station *sta) const;
 
 		// sets the amplitude to either the SNR or absolute amplitude
-		void setAmplitudeSNR(Seiscomp::DataModel::Amplitude*);
-		void setAmplitudeAbs(Seiscomp::DataModel::Amplitude*);
+		void setAmplitudeSNR(const Seiscomp::DataModel::Amplitude*);
+		void setAmplitudeAbs(const Seiscomp::DataModel::Amplitude*);
 
 		// get and set the origin this pick is associated with
 		const Origin *origin() const { return _origin.get(); }

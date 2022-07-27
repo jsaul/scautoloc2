@@ -17,17 +17,12 @@
 #include <seiscomp/autoloc/autoloc.h>
 #include <seiscomp/autoloc/util.h>
 #include <seiscomp/autoloc/sc3adapters.h>
-
 #include <seiscomp/logging/log.h>
-#include <seiscomp/datamodel/utils.h>
-#include <seiscomp/datamodel/network.h>
-#include <seiscomp/datamodel/station.h>
 
 
 namespace Seiscomp {
 
 namespace Autoloc {
-
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

@@ -17,6 +17,7 @@
 #include <seiscomp/autoloc/nucleator.h>
 #include <seiscomp/logging/log.h>
 #include <seiscomp/core/strings.h>
+#include <seiscomp/core/exceptions.h>
 
 #include <iostream>
 #include <fstream>
@@ -119,6 +120,8 @@ bool GridSearch::init()
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 bool GridSearch::setGridFilename(const std::string &filename)
 {
+	if (filename.empty())
+		throw Seiscomp::Core::ValueException("empty grid file name");
 	_gridFilename = filename;
 	return _readGrid(filename);
 }

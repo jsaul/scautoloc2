@@ -128,7 +128,7 @@ void Pick::setStation(const Station *sta) const
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-void Pick::setAmplitudeSNR(Seiscomp::DataModel::Amplitude *scampl)
+void Pick::setAmplitudeSNR(const Seiscomp::DataModel::Amplitude *scampl)
 {
 	snr = scampl->amplitude().value();
 	scamplSNR = scampl;
@@ -139,7 +139,7 @@ void Pick::setAmplitudeSNR(Seiscomp::DataModel::Amplitude *scampl)
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-void Pick::setAmplitudeAbs(Seiscomp::DataModel::Amplitude *scampl)
+void Pick::setAmplitudeAbs(const Seiscomp::DataModel::Amplitude *scampl)
 {
 	amp = scampl->amplitude().value();
 	per = (scampl->type() == "mb") ? scampl->period().value() : 1;

@@ -12,7 +12,7 @@
  ***************************************************************************/
 
 
-#define SEISCOMP_COMPONENT Autoloc
+#define SEISCOMP_COMPONENT Autoloc2
 // These defines are only used in testing during development:
 //#define EXTRA_DEBUGGING
 //#define LOG_RELOCATOR_CALLS
@@ -41,6 +41,7 @@ Autoloc3::Autoloc3()
 	_associator.setPickPool(&pickPool);
 	_relocator.setMinimumDepth(_config.minimumDepth);
 	scconfig = NULL;
+	processingEnabled = true;
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -96,156 +97,6 @@ void Autoloc3::dumpState() const
 {
 	for (const Autoloc::DataModel::OriginPtr origin : _origins)
 		SEISCOMP_INFO_S(printOneliner(origin.get()));
-}
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
-
-
-// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool Autoloc3::_report(Seiscomp::DataModel::Origin *scorigin)
-{
-	// This is a dummy intended to be overloaded properly.
-	SEISCOMP_WARNING("Autoloc3::_report should be reimplemented");
-	return true;
-}
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
-
-
-// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool Autoloc3::_report(const Autoloc::DataModel::Origin *origin)
-{
-	Seiscomp::DataModel::OriginPtr scorigin =
-		Autoloc::exportToSC(origin, _config.reportAllPhases);
-
-	Seiscomp::DataModel::CreationInfo ci;
-	ci.setAgencyID(_config.agencyID);
-	ci.setAuthor(_config.author);
-	ci.setCreationTime(now());
-	scorigin->setCreationInfo(ci);
-
-	return _report(scorigin.get());
-}
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
-
-
-// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-void Autoloc3::report()
-{
-	using namespace Autoloc::DataModel;
-
-	for (OriginVector::iterator
-	     it = _newOrigins.begin(); it != _newOrigins.end(); ) {
-
-		Origin *origin = it->get();
-
-		if (_nextDue.find(origin->id) == _nextDue.end())
-			// first origin -> report immediately
-			_nextDue[origin->id] = 0;
-
-		_outgoing[origin->id] = origin;
-		it = _newOrigins.erase(it);
-	}
-
-
-	Time t = now();
-	std::vector<OriginID> ids;
-
-	int dnmax = _config.publicationIntervalPickCount;
-
-	for (std::map<int, OriginPtr>::iterator
-	     it = _outgoing.begin(); it != _outgoing.end(); ++it) {
-
-		const Origin *origin = it->second.get();
-		double dt = t - _nextDue[origin->id];
-		int dn = dnmax;
-
-		if (_lastSent.find(origin->id) != _lastSent.end()) {
-			size_t phaseCount =  origin->phaseCount();
-			size_t lastPhaseCount = _lastSent[origin->id]->phaseCount();
-			// size_t phaseCount =  origin->definingPhaseCount();
-			// size_t lastPhaseCount = _lastSent[origin->id]->definingPhaseCount();
-			dn = phaseCount - lastPhaseCount;
-		}
-
-		if (dt >= 0 || dn >= dnmax)
-			ids.push_back(origin->id);
-	}
-
-	for(std::vector<OriginID>::iterator
-	    it = ids.begin(); it != ids.end(); ++it) {
-
-		OriginID id = *it;
-		const Origin *origin = _outgoing[id].get();
-
-		if ( ! _publishable(origin) ) {
-			_outgoing.erase(id);
-			continue;
-		}
-
-		// Test if we have previously sent an earlier version
-		// of this origin. If so, test if the current version
-		// has improved.
-		// TODO: perhaps move this test to _publishable()
-		if (_lastSent.find(id) != _lastSent.end()) {
-			const Origin *previous = _lastSent[id].get();
-
-			// The main criterion is definingPhaseCount.
-			// However, there may be origins with additional
-			// but excluded phases  like PKP and such
-			// origins should also be sent.
-			if (origin->definingPhaseCount() <=
-			    previous->definingPhaseCount()) {
-
-				if (origin->arrivals.size() <=
-				    previous->arrivals.size() ||
-				    _now - previous->timestamp < 150) {
-					// TODO: make 150 configurable
-
-					// ... some more robust criteria perhaps
-					SEISCOMP_INFO("Origin %ld not sent (no improvement)", origin->id);
-					_outgoing.erase(id);
-					continue;
-				}
-			}
-		}
-
-		if (_report(origin)) {
-			SEISCOMP_INFO_S(" OUT " + printOneliner(origin));
-
-			// Compute the time at which the next origin in this
-			// series would be due to be reported, if any.
-			int N = origin->definingPhaseCount();
-			// This defines the minimum time interval between
-			// adjacent origins to be reported. Larger origins may
-			// put a higher burden on the system, but change less,
-			// so larger time intervals are justified. The time
-			// interval is a linear function of the defining phase
-			// count.
-			double
-				A  = _config.publicationIntervalTimeSlope,
-				B  = _config.publicationIntervalTimeIntercept,
-				dt = A*N + B;
-
-			if (dt < 0) {
-				_nextDue[id] = 0;
-				SEISCOMP_INFO("Autoloc3::_flush() origin=%ld  next due IMMEDIATELY", id);
-			}
-			else {
-				_nextDue[id] = t + dt;
-				SEISCOMP_INFO("Autoloc3::_flush() origin=%ld  next due: %s", id, time2str(_nextDue[id]).c_str());
-			}
-
-			// save a copy of the origin
-			_lastSent[id] = new Origin(*origin);
-			_lastSent[id]->timestamp = t;
-			_outgoing.erase(id);
-		}
-	}
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -317,10 +168,6 @@ Seiscomp::Core::Time
 Autoloc3::now()
 {
 	return sctime(_now);
-//	if (_config.playback)
-//		return _playbackTime;
-//
-//	return Autoloc::DataModel::Time(Core::Time::GMT());
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -343,7 +190,7 @@ bool Autoloc3::storeInPool(const Autoloc::DataModel::Pick *pick)
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool Autoloc3::feed(Seiscomp::DataModel::Pick *scpick)
+bool Autoloc3::feed(const Seiscomp::DataModel::Pick *scpick)
 {
 	const std::string &pickID = scpick->publicID();
 
@@ -375,9 +222,9 @@ bool Autoloc3::feed(Seiscomp::DataModel::Pick *scpick)
 		using namespace Seiscomp::DataModel;
 		SEISCOMP_WARNING_S("Pick has no evaluation mode: " + pickID);
 		SEISCOMP_WARNING  ("Setting evaluation mode to AUTOMATIC");
-		scpick->setEvaluationMode(EvaluationMode(AUTOMATIC));
+		// FIXME: cast...
+		((Pick*)scpick)->setEvaluationMode(EvaluationMode(AUTOMATIC));
 	}
-
 
 	Autoloc::DataModel::Pick* pick = new Autoloc::DataModel::Pick(scpick);
 	if ( ! pick )
@@ -397,7 +244,7 @@ bool Autoloc3::feed(Seiscomp::DataModel::Pick *scpick)
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool Autoloc3::feed(Seiscomp::DataModel::Amplitude *scampl)
+bool Autoloc3::feed(const Seiscomp::DataModel::Amplitude *scampl)
 {
 	const std::string &atype  = scampl->type();
 	const std::string &pickID = scampl->pickID();
@@ -419,6 +266,7 @@ bool Autoloc3::feed(Seiscomp::DataModel::Amplitude *scampl)
 	try {
 		if ( atype == _config.amplTypeSNR )
 			pick->setAmplitudeSNR(scampl);
+		else
 		if ( atype == _config.amplTypeAbs )
 			pick->setAmplitudeAbs(scampl);
 	}
@@ -481,8 +329,9 @@ bool Autoloc3::feed(Seiscomp::DataModel::Origin *scorigin)
 	}
 
 
-	// TODO: Vorher konsistente Picks/Arrivals sicher stellen.
-
+	// Curently, importFromSC may require database access if certain
+	// picks/amplitudes are missing. TODO: This should be avoided and all
+	// needed objects should be readily available without database.
 	Autoloc::DataModel::Origin *origin = importFromSC(scorigin);
 	if ( ! origin ) {
 		SEISCOMP_ERROR_S("Failed to import origin " + scorigin->publicID());
@@ -497,6 +346,26 @@ bool Autoloc3::feed(Seiscomp::DataModel::Origin *scorigin)
 	SEISCOMP_INFO_S("Using origin from agency " + objectAgencyID(scorigin));
 
 	return feed(origin);
+}
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+void Autoloc3::setProcessingEnabled(bool v)
+{
+	processingEnabled = v;
+}
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool Autoloc3::isProcessingEnabled() const
+{
+	return processingEnabled;
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -524,6 +393,15 @@ bool Autoloc3::feed(const Autoloc::DataModel::Pick *pick)
 			SEISCOMP_DEBUG(
 				"process pick %-35s %c   waiting for amplitude",
 				pick->id.c_str(), statusFlag(pick));
+		return false;
+	}
+
+	if ( ! processingEnabled) {
+		SEISCOMP_DEBUG(
+			"process pick %-35s %c   "
+			"processing currently disabled",
+			pick->id.c_str(), statusFlag(pick));
+
 		return false;
 	}
 
@@ -557,232 +435,6 @@ bool Autoloc3::feed(const Autoloc::DataModel::Pick *pick)
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 Autoloc::DataModel::Origin*
-Autoloc3::importFromSC(
-	const Seiscomp::DataModel::Origin *scorigin)
-{
-	double lat  = scorigin->latitude().value();
-	double lon  = scorigin->longitude().value();
-	double dep  = scorigin->depth().value();
-	double time = double(scorigin->time().value() - Core::Time());
-
-	Autoloc::DataModel::Origin *origin =
-		new Autoloc::DataModel::Origin(lat, lon, dep, time);
-
-	try {
-		origin->laterr =
-			0.5*scorigin->latitude().lowerUncertainty() +
-			0.5*scorigin->latitude().upperUncertainty();
-	}
-	catch ( ... ) {
-		try {
-			origin->laterr  = scorigin->latitude().uncertainty();
-		}
-		catch ( ... ) {
-			origin->laterr = 0;
-		}
-	}
-
-	try {
-		origin->lonerr =
-			0.5*scorigin->longitude().lowerUncertainty() +
-			0.5*scorigin->longitude().upperUncertainty();
-	}
-	catch ( ... ) {
-		try {
-			origin->lonerr = scorigin->longitude().uncertainty();
-		}
-		catch ( ... ) {
-			origin->lonerr = 0;
-		}
-	}
-
-	try {
-		origin->deperr =
-			0.5*scorigin->depth().lowerUncertainty() +
-			0.5*scorigin->depth().upperUncertainty();
-	}
-	catch ( ... ) {
-		try {
-			origin->deperr = scorigin->depth().uncertainty();
-		}
-		catch ( ... ) {
-			origin->deperr = 0;
-		}
-	}
-
-	try {
-		origin->timeerr =
-			0.5*scorigin->time().lowerUncertainty() +
-			0.5*scorigin->time().upperUncertainty();
-	}
-	catch ( ... ) {
-		try {
-			origin->timeerr = scorigin->time().uncertainty();
-		}
-		catch ( ... ) {
-			origin->timeerr = 0;
-		}
-	}
-
-	int arrivalCount = scorigin->arrivalCount();
-	for (int i=0; i<arrivalCount; i++) {
-
-		const std::string &pickID = scorigin->arrival(i)->pickID();
-/*
-		Seiscomp::DataModel::Pick *scpick = Seiscomp::DataModel::Pick::Find(pickID);
-		if ( ! scpick) {
-			SEISCOMP_ERROR_S("Pick " + pickID + " not found - cannot import origin");
-			delete origin;
-			return NULL;
-			// TODO:
-			// Trotzdem mal schauen, ob wir den Pick nicht
-			// als Autoloc-Pick schon haben
-		}
-*/
-		// Retrieve pick from our internal pick pool. This must not fail.
-		const Autoloc::DataModel::Pick *pick = pickFromPool(pickID);
-
-		// If the pick pool failed, we try the database
-		// TODO: Use Cache here!
-		if ( ! pick ) {
-			Seiscomp::DataModel::PickPtr scpick =
-				loadPick(pickID);
-			Seiscomp::DataModel::AmplitudePtr scamplAbs =
-				loadAmplitude(pickID, _config.amplTypeAbs);
-			Seiscomp::DataModel::AmplitudePtr scamplSNR =
-				loadAmplitude(pickID, _config.amplTypeSNR);
-
-			if ( ! setupStation(scpick.get()))
-				continue;
-
-			Autoloc::DataModel::Pick *p = // FIXME
-				new Autoloc::DataModel::Pick(scpick.get());
-			_addStationInfo(p);
-
-			if (scamplAbs)
-				p->setAmplitudeAbs(scamplAbs.get());
-			else
-				SEISCOMP_WARNING_S("Missing amplitude "+pickID+" abs");
-
-			if (scamplSNR)
-				p->setAmplitudeSNR(scamplSNR.get());
-			else
-				SEISCOMP_WARNING_S("Missing amplitude "+pickID+" snr");
-
-			storeInPool(p);
-
-			if (scpick) {
-				pick = pickFromPool(pickID);
-				if (pick)
-					SEISCOMP_INFO_S("Pick " + pickID + " loaded from database");
-			}
-		}
-
-		if ( ! pick ) {
-			// FIXME: This may also happen after Autoloc cleaned up
-			//        older picks, so the pick isn't available any more!
-			// TODO: Use Cache here!
-			SEISCOMP_ERROR_S("Pick " + pickID +
-					 " not found in internal pick pool - SKIPPING this pick");
-			if (Seiscomp::DataModel::PublicObject::Find(pickID)) {
-				SEISCOMP_ERROR("HOWEVER, this pick is present in pool of public objects");
-				SEISCOMP_ERROR("Are you doing an XML playback?");
-			}
-
-			// This actually IS an error but we try to work around
-			// it instead of giving up on this origin completely.
-			continue; // FIXME
-//			delete origin;
-//			return NULL;
-		}
-
-		Autoloc::DataModel::Arrival arr(
-			pick
-			//, const std::string &phase="P", double residual=0
-			);
-		try {
-			arr.residual = scorigin->arrival(i)->timeResidual();
-		}
-		catch(...) {
-			arr.residual = 0;
-			SEISCOMP_WARNING("got arrival with timeResidual not set");
-		}
-
-		try {
-			arr.distance = scorigin->arrival(i)->distance();
-		}
-		catch(...) {
-			arr.distance = 0;
-			SEISCOMP_WARNING("got arrival with distance not set");
-		}
-
-		try {
-			arr.azimuth = scorigin->arrival(i)->azimuth();
-		}
-		catch(...) {
-			arr.azimuth = 0;
-			SEISCOMP_WARNING("got arrival with azimuth not set");
-		}
-
-		if (manual(scorigin)) {
-			// for manual origins we allow secondary phases like pP
-			arr.phase = scorigin->arrival(i)->phase();
-
-			try {
-				if (scorigin->arrival(i)->timeUsed() == false)
-					arr.excluded = Autoloc::DataModel::Arrival::ManuallyExcluded;
-			}
-			catch(...) {
-				// In a manual origin in which the time is not
-				// explicitly used we treat the arrival as if
-				// it was explicitly excluded.
-				arr.excluded = Autoloc::DataModel::Arrival::ManuallyExcluded;
-			}
-		}
-
-		origin->arrivals.push_back(arr);
-	}
-
-	origin->publicID = scorigin->publicID();
-
-	try {
-		// FIXME: In scolv the Origin::depthType may not have been set!
-		Seiscomp::DataModel::OriginDepthType dtype = scorigin->depthType();
-		if ( dtype == Seiscomp::DataModel::OriginDepthType(
-				Seiscomp::DataModel::FROM_LOCATION) )
-			origin->depthType = Autoloc::DataModel::Origin::DepthFree;
-
-		else if ( dtype == Seiscomp::DataModel::OriginDepthType(
-				Seiscomp::DataModel::OPERATOR_ASSIGNED) )
-			origin->depthType = Autoloc::DataModel::Origin::DepthManuallyFixed;
-	}
-	catch(...) {
-		SEISCOMP_WARNING("Origin::depthType is not set!");
-		bool adoptManualDepth = _config.adoptManualDepth;
-		if (manual(scorigin) && adoptManualDepth == true) {
-			// This is a hack! We cannot know wether the operator
-			// assigned a depth manually, but we can assume the
-			// depth to be operator approved and this is better
-			// than nothing.
-			// TODO: Make this behavior configurable?
-			origin->depthType = Autoloc::DataModel::Origin::DepthManuallyFixed;
-			SEISCOMP_WARNING("Treating depth as if it was manually fixed");
-		}
-		else {
-			origin->depthType = Autoloc::DataModel::Origin::DepthFree;
-			SEISCOMP_WARNING("Leaving depth free");
-		}
-	}
-
-	return origin;
-}
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
-
-
-// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-Autoloc::DataModel::Origin*
 Autoloc3::_findMatchingOrigin(const Autoloc::DataModel::Origin *origin)
 {
 	using namespace Autoloc::DataModel;
@@ -805,7 +457,8 @@ Autoloc3::_findMatchingOrigin(const Autoloc::DataModel::Origin *origin)
 		//
 		// This time difference may be made configurable but this is
 		// not crucial.
-		if (fabs(origin->time - existing->time) > 20*60) continue;
+		if (fabs(origin->time - existing->time) > 20*60)
+			continue;
 
 		unsigned int identical=0, similar=0;
 
@@ -846,7 +499,6 @@ Autoloc3::_findMatchingOrigin(const Autoloc::DataModel::Origin *origin)
 		}
 
 		if (identical+similar > 0) {
-//			SEISCOMP_DEBUG("HURRA!!!! %9ld   identical %3d   similar %3d", existing->id,identical, similar);
 			if (identical+similar > bestmatch) {
 				bestmatch = identical+similar;
 				found = existing.get();
@@ -921,7 +573,7 @@ bool Autoloc3::feed(Autoloc::DataModel::Origin *origin)
 			Arrival arr = found->arrivals[i];
 			if ( ! arr.pick->station()) {
 				SEISCOMP_ERROR("This should NEVER happen:");
-				SEISCOMP_ERROR("Arrival referencing pick without station");
+				SEISCOMP_ERROR("Arrival references pick without station");
 				SEISCOMP_ERROR("Pick is %s", arr.pick->id.c_str());
 				continue;
 			}
@@ -1192,23 +844,31 @@ Autoloc3::merge(
 	SEISCOMP_DEBUG_S(" MRG2 " + printOneliner(origin2));
 
 	// This is a brute-force merge! Put everything into one origin.
-	int arrivalCount2 = origin2->arrivals.size();
-	int commonPickCount = 0;
-	int commonUsedCount = 0;
-	for(int i2=0; i2<arrivalCount2; i2++) {
-		Arrival arr = origin2->arrivals[i2];
+	for (const Arrival &arr2: origin2->arrivals) {
 		// Skip pick if an arrival already references it
-		bool found = combined->findArrival(arr.pick.get()) != -1;
-		if (found) {
-			commonPickCount++;
-			if ( ! arr.excluded )
-				commonUsedCount++;
+		bool found = combined->findArrival(arr2.pick.get()) != -1;
+		if (found)
 			continue;
+
+		// Skip pick if origin1 already has a pick from that station
+		// for the same phase.
+		for (const Arrival &arr1: origin1->arrivals) {
+			if (arr1.pick->station() == arr2.pick->station() &&
+			    arr1.phase == arr2.phase) {
+				found = true;
+				break;
+			}
 		}
-		arr.excluded = Arrival::TemporarilyExcluded;
-		// FIXME: The phase ID may be wrong.
-		combined->add(arr);
-		SEISCOMP_DEBUG(" MRG %ld->%ld added %s", origin2->id, origin1->id, arr.pick->id.c_str());
+		if (found)
+			continue;
+
+		Arrival tmp = arr2;
+		tmp.excluded = Arrival::TemporarilyExcluded;
+		// FIXME: The phase ID may not match.
+		combined->add(tmp);
+		SEISCOMP_DEBUG(" MRG %ld->%ld added %s",
+			       origin2->id, origin1->id,
+			       arr2.pick->id.c_str());
 	}
 
 #ifdef LOG_RELOCATOR_CALLS
@@ -1237,8 +897,10 @@ Autoloc3::merge(
 	// now see which of the temporarily excluded new arrivals have
 	// acceptable residuals
 	for (Arrival &arr : combined->arrivals) {
-		if ( arr.excluded == Arrival::TemporarilyExcluded)
-			arr.excluded =  _residualOK(arr, 1.3, 1.8) ? Arrival::NotExcluded : Arrival::LargeResidual;
+		if (arr.excluded == Arrival::TemporarilyExcluded)
+			arr.excluded = _residualOK(arr, 1.3, 1.8)
+				? Arrival::NotExcluded
+				: Arrival::LargeResidual;
 	}
 
 	_trimResiduals(combined);
@@ -2430,30 +2092,6 @@ bool Autoloc3::_excludeDistantStations(Autoloc::DataModel::Origin *origin)
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool Autoloc3::_passedFinalCheck(const Autoloc::DataModel::Origin *origin)
-{
-	using namespace Autoloc::DataModel;
-
-// Do not execute the check here. It may result in missing origins which are
-// correct after relocation, move the check to: Autoloc3::_publishable
-//	if (origin->dep > _config.maxDepth) {
-//		SEISCOMP_DEBUG("Ignore origin %ld: depth %.3f km > maxDepth %.3f km",
-//		               origin->id, origin->dep, _config.maxDepth);
-//		return false;
-//	}
-
-	if ( ! origin->preliminary &&
-	     origin->definingPhaseCount() < _config.minPhaseCount)
-		return false;
-
-	return true;
-}
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
-
-
-// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 bool Autoloc3::_passedFilter(Autoloc::DataModel::Origin *origin)
 {
 	using namespace Autoloc::DataModel;
@@ -2508,43 +2146,6 @@ bool Autoloc3::_passedFilter(Autoloc::DataModel::Origin *origin)
 		return false;
 
 	_ensureConsistentArrivals(origin);
-
-	return true;
-}
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
-
-
-// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool Autoloc3::_publishable(const Autoloc::DataModel::Origin *origin) const
-{
-	using namespace Autoloc::DataModel;
-
-	if (origin->quality.aziGapSecondary > _config.maxAziGapSecondary) {
-		SEISCOMP_INFO("Origin %ld not sent (too large SGAP of %3.0f > %3.0f)",
-			      origin->id, origin->quality.aziGapSecondary, _config.maxAziGapSecondary);
-		return false;
-	}
-
-	if (origin->score < _config.minScore) {
-		SEISCOMP_INFO("Origin %ld not sent (too low score of %.1f < %.1f)",
-			      origin->id, origin->score, _config.minScore);
-		return false;
-	}
-
-	if (origin->rms() > _config.maxRMS) {
-		SEISCOMP_INFO("Origin %ld not sent (too large RMS of %.1f > %.1f)",
-			      origin->id, origin->rms(), _config.maxRMS);
-		return false;
-	}
-
-
-	if (origin->dep > _config.maxDepth) {
-		SEISCOMP_INFO("Origin %ld too deep: %.1f km > %.1f km (maxDepth)",
-			      origin->id, origin->dep, _config.maxDepth);
-		return false;
-	}
 
 	return true;
 }
@@ -3900,8 +3501,8 @@ bool Autoloc3::_depthIsResolvable(Autoloc::DataModel::Origin *origin)
 
 
 #ifdef EXTRA_DEBUGGING
-	SEISCOMP_DEBUG("__depthIsResolvable poorly for origin %ld (using new criterion)", origin->id);
-	SEISCOMP_DEBUG("__depthIsResolvable using old criterion now");
+	SEISCOMP_DEBUG("_depthIsResolvable poorly for origin %ld (using new criterion)", origin->id);
+	SEISCOMP_DEBUG("_depthIsResolvable using old criterion now");
 #endif
 
 	test = new Origin(*origin);
