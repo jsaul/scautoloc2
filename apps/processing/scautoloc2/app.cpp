@@ -181,10 +181,10 @@ void AutolocApp::createCommandLineDescription() {
 	commandline().addOption(
 		"Settings", "xxl-dead-time", "", &_config.xxlDeadTime);
 
-	commandline().addOption(
-		"Settings", "min-sta-count-ignore-pkp", 
-		"Minimum station count for which we ignore PKP phases",
-		&_config.minStaCountIgnorePKP);
+//	commandline().addOption(
+//		"Settings", "min-sta-count-ignore-pkp", 
+//		"Minimum station count for which we ignore PKP phases",
+//		&_config.minStaCountIgnorePKP);
 	commandline().addOption(
 		"Settings", "min-score-bypass-nucleator",
 		"Minimum score at which the nucleator is bypassed",
@@ -532,11 +532,11 @@ bool AutolocApp::initConfiguration()
 	}
 	catch (...) {}
 
-	try {
-		_config.minStaCountIgnorePKP =
-			configGetInt("autoloc.minStaCountIgnorePKP");
-	}
-	catch (...) {}
+//	try {
+//		_config.minStaCountIgnorePKP =
+//			configGetInt("autoloc.minStaCountIgnorePKP");
+//	}
+//	catch (...) {}
 
 	try {
 		_config.reportAllPhases =
@@ -1402,9 +1402,12 @@ bool AutolocApp::feed(Seiscomp::DataModel::Origin *scorigin)
 			Autoloc::Autoloc3::isProcessingEnabled();
 		Autoloc::Autoloc3::setProcessingEnabled(false);
 		for (PickAmplitudeSet &s: pa) {
-			Autoloc::Autoloc3::feed(s.pick.get());
-			Autoloc::Autoloc3::feed(s.amplitudeSNR.get());
-			Autoloc::Autoloc3::feed(s.amplitudeAbs.get());
+// FIXME TEMP
+//			Autoloc::Autoloc3::feed(s.pick.get());
+//			if (s.amplitudeSNR)
+//				Autoloc::Autoloc3::feed(s.amplitudeSNR.get());
+//			if (s.amplitudeAbs)
+//				Autoloc::Autoloc3::feed(s.amplitudeAbs.get());
 		}
 		// restore processing state
 		Autoloc::Autoloc3::setProcessingEnabled(wasProcessingEnabled);

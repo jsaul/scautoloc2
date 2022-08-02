@@ -81,6 +81,13 @@ class Autoloc3 {
 		void shutdown();
 
 	public:
+		// Add a pick ID to the list of picks to track.
+		// Tracking picks means that association, relocation etc.
+		// related to this pick will be looged more verbosely.
+		void trackPick(const std::string &pickID);
+		bool isTrackedPick(const std::string &pickID) const;
+
+	public:
 		// Current time. In offline mode time of the last pick.
 		Seiscomp::Core::Time now();
 
@@ -106,7 +113,6 @@ class Autoloc3 {
 		void setProcessingEnabled(bool yesno=true);
 		bool isProcessingEnabled() const;
 
-
 		// Return true if the origin is trusted in the sense that we
 		// want to use this origin in the processing. In other words
 		// is must be either
@@ -114,7 +120,6 @@ class Autoloc3 {
 		//  * an internal, manual origin
 		// and the processing for this type of origin must be enabled.
 		bool isTrustedOrigin(const Seiscomp::DataModel::Origin*) const;
-
 
 		// Feed an external or manual Origin
 		// TODO: Ensure that all needed picks/amplitudes have
@@ -226,6 +231,10 @@ class Autoloc3 {
 		// existing origin and -upon failure- nucleate a new one.
 		bool _process(const Autoloc::DataModel::Pick*);
 
+		bool _processImportedOrigin(Autoloc::DataModel::Origin*);
+		bool _processManualOrigin(Autoloc::DataModel::Origin*);
+
+
 		// If the pick is an XXL pick, try to see if there are more
 		// XXL picks possibly giving rise to a preliminary origin
 		Autoloc::DataModel::OriginPtr _xxlPreliminaryOrigin(
@@ -235,7 +244,7 @@ class Autoloc3 {
 		// and relocating.
 		//
 		// Returns true if the score could be enhanced.
-		bool _enhanceScore(Autoloc::DataModel::Origin*, int maxloops=0);
+		bool _enhanceScore(Autoloc::DataModel::Origin*, size_t maxloops=0);
 
 		// Rename P <-> PKP accoring to distance/traveltime
 		// FIXME: This is a hack we would want to avoid.
@@ -449,6 +458,8 @@ class Autoloc3 {
 		std::string   _pickLogFilePrefix;
 		std::string   _pickLogFileName;
 		std::ofstream _pickLogFile;
+
+		std::vector<std::string> _trackedPicks;
 
 		bool processingEnabled;
 };

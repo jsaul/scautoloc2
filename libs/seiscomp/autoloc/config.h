@@ -163,8 +163,8 @@ class Config {
 		double minScore{8.};
 
 		// Minimum station count for which we ignore PKP phases
-		// XXX not yet used
-		int minStaCountIgnorePKP{15};
+		// OBSOLETE
+		// int minStaCountIgnorePKP{15};
 
 		// if a pick can be associated to an origin with at
 		// least this high a score, bypass the nucleator,

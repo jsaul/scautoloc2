@@ -78,6 +78,18 @@ bool travelTimeP (
 	const Autoloc::DataModel::Station*,
 	TravelTime&);
 
+bool travelTime (
+	double lat1, double lon1, double dep1,
+	double lat2, double lon2, double alt2,
+	const std::string &phase,
+	TravelTime&);
+
+bool travelTime (
+	const Autoloc::DataModel::Hypocenter*,
+	const Autoloc::DataModel::Station*,
+	const std::string &phase,
+	TravelTime&);
+
 
 // Format an Autoloc::DataModel::Time time as time stamp.
 std::string time2str(const Autoloc::DataModel::Time &t);

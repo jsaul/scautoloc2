@@ -20,7 +20,6 @@
 #include <seiscomp/logging/log.h>
 #include <seiscomp/core/datetime.h>
 #include <seiscomp/math/geo.h>
-#include <seiscomp/math/mean.h>
 #include <seiscomp/datamodel/inventory.h>
 
 #include <math.h>
@@ -121,6 +120,37 @@ bool travelTimeP(
 	double lat2, double lon2, double alt2,
 	TravelTime &tt)
 {
+	static std::string P("P");
+	return travelTime(lat1, lon1, dep1, lat2, lon2, alt2, P, tt);
+}
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool travelTimeP(
+	const Autoloc::DataModel::Hypocenter *origin,
+        const Autoloc::DataModel::Station *station,
+	TravelTime &tt)
+{
+	return travelTimeP(
+		origin->lat, origin->lon, origin->dep,
+		station->lat, station->lon, station->alt,
+		tt);
+}
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool travelTime(
+	double lat1, double lon1, double dep1,
+	double lat2, double lon2, double alt2,
+	const std::string &code,
+	TravelTime &tt)
+{
 	static Seiscomp::TravelTimeTable ttt;
 
 	Seiscomp::TravelTimeList
@@ -133,10 +163,12 @@ bool travelTimeP(
 	// Pdiff somewhere. This is the max. Pdiff distance in degrees.
 	double maxPdiffDelta = 114;
 
+	// for  distances < maxPdiffDelta, always take 1st arrival
+	bool useFirstArrival = (code == "P" && delta < maxPdiffDelta);
+
 	for (TravelTime &t : *ttlist) {
 		tt = t;
-		if (delta < maxPdiffDelta)
-			// for  distances < maxPdiffDelta, always take 1st arrival
+		if (useFirstArrival)
 			break;
 		if (tt.phase.substr(0,2) != "PK")
 			// for  distances >= maxPdiffDelta, skip Pdiff etc. and
@@ -154,9 +186,10 @@ bool travelTimeP(
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool travelTimeP(
+bool travelTime(
 	const Autoloc::DataModel::Hypocenter *origin,
         const Autoloc::DataModel::Station *station,
+	const std::string &code,
 	TravelTime &tt)
 {
 	return travelTimeP(
@@ -204,7 +237,9 @@ double meandev(const Autoloc::DataModel::Origin* origin)
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-std::string printOrigin(const Autoloc::DataModel::Origin *origin, bool oneliner)
+std::string printOrigin(
+	const Autoloc::DataModel::Origin *origin,
+	bool oneliner)
 {
 	if (origin==NULL)
 		return "invalid origin";
@@ -407,19 +442,20 @@ static double avgfn2(double x, double plateauWidth=0.2)
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-double originScore(const Autoloc::DataModel::Origin *origin, double maxRMS, double networkSizeKm)
+double originScore(
+	const Autoloc::DataModel::Origin *origin,
+	double maxRMS,
+	double networkSizeKm)
 {
-//	networkSizeKm = 200.;
-
 	// FIXME:
 	((Autoloc::DataModel::Origin*)origin)->arrivals.sort();
 
 	double score = 0, amplScoreMax=0;
 	int arrivalCount = origin->arrivals.size();
-	//int n = origin->definingPhaseCount();
 	for(int i=0; i<arrivalCount; i++) {
 		double phaseScore = 1; // 1 for P / 0.3 for PKP
-		Autoloc::DataModel::Arrival &arr = ((Autoloc::DataModel::Origin*)origin)->arrivals[i];
+		Autoloc::DataModel::Arrival &arr =
+			((Autoloc::DataModel::Origin*)origin)->arrivals[i];
 		Autoloc::DataModel::PickCPtr pick = arr.pick;
 		if ( ! pick->station())
 			continue;
@@ -451,16 +487,22 @@ double originScore(const Autoloc::DataModel::Origin *origin, double maxRMS, doub
 
 		double d = arr.distance;
 		// FIXME: This is HIGHLY experimental:
-		// For a small, dense network the distance score must decay quickly with distance
-		// whereas for teleseismic usages it must be a much broader function
-		double r = networkSizeKm <= 0 ? pick->station()->maxNucDist : (0.5*networkSizeKm/111.195);
+		// For a small, dense network the distance score must decay
+		// quickly with distance whereas for teleseismic usages it
+		// must be a much broader function
+		double r = networkSizeKm <= 0
+			? pick->station()->maxNucDist
+			: (0.5*networkSizeKm/111.195);
 		double distScore = 1.5*exp(-d*d/(r*r));
 
 		// Any amplitude > 1 percent of the XXL threshold
 		// will have an increased amplitude score
 		double q = 0.8;
 		if (normamp <= 0) {
-			SEISCOMP_WARNING("THIS SHOULD NEVER HAPPEN: pick %s with  normamp %g  amp %g (not critical)",
+			SEISCOMP_WARNING(
+				"THIS SHOULD NEVER HAPPEN: "
+				"pick %s with  normamp %g  amp %g "
+				"(not critical)",
 				pick->id.c_str(), normamp, pick->amp);
 			continue;
 		}
@@ -469,9 +511,10 @@ double originScore(const Autoloc::DataModel::Origin *origin, double maxRMS, doub
 		// The score must *not* be reduced based on low amplitude
 		if (amplScore < 1) amplScore = 1;
 
-		// Amplitudes usually decrease with distance.
-		// This hack takes this fact into account for computing the score.
-		// A sudden big amplitude at large distance cannot increase the score too badly
+		// Amplitudes decrease with distance.
+		// This hack takes this fact into account for computing
+		// the score. A sudden big amplitude at large distance
+		// cannot increase the score too badly.
 		if(amplScoreMax==0)
 			amplScoreMax = amplScore;
 		else {
@@ -497,7 +540,8 @@ double originScore(const Autoloc::DataModel::Origin *origin, double maxRMS, doub
 		arr.tscore = timeScore;
 
 		if (arr.excluded) {
-			if (arr.excluded != Autoloc::DataModel::Arrival::UnusedPhase)
+			if (arr.excluded !=
+			    Autoloc::DataModel::Arrival::UnusedPhase)
 				continue;
 			if (arr.phase.substr(0,3) != "PKP")
 				continue;
@@ -601,7 +645,9 @@ bool emptyLocationCode(const std::string &loc)
 bool valid(const Autoloc::DataModel::Pick *pick)
 {
 	if ( ! pick->station()) {
-		SEISCOMP_WARNING("Pick %s without station info rejected", pick->id.c_str());
+		SEISCOMP_WARNING(
+			"Pick %s without station info rejected",
+			pick->id.c_str());
 		return false;
 	}
 
@@ -615,12 +661,16 @@ bool valid(const Autoloc::DataModel::Pick *pick)
 	// Ensure plausible SNR
 	// FIXME: Make the SNR range configurable
 	if (pick->snr <= 0 || pick->snr > 1.0E7) {
-		SEISCOMP_WARNING("Pick %s with snr of %g rejected", pick->id.c_str(), pick->snr);
+		SEISCOMP_WARNING(
+			"Pick %s with snr of %g rejected",
+			pick->id.c_str(), pick->snr);
 		return false;
 	}
 
 	if ( ! hasAmplitude(pick)) {
-		SEISCOMP_WARNING("Pick %s with missing amplitudes rejected", pick->id.c_str());
+		SEISCOMP_WARNING(
+			"Pick %s with missing amplitudes rejected",
+			pick->id.c_str());
 		return false;
 	}
 

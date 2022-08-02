@@ -1,4 +1,5 @@
-%module (package="seiscomp") autoloc
+%module (package="seiscomp", directors="1") autoloc
+%feature("director") Seiscomp::Autoloc::Autoloc3;
 
 %newobject Seiscomp::DataModel::inventoryFromStationLocationFile;
 

@@ -319,9 +319,10 @@ class Origin : public Hypocenter {
 		OriginError error;
 
 	public:
-		// TODO:
-		// "Inherited" manual origin
-		// Seiscomp::DataModel::OriginCPtr scmanual;
+		// This is the reference origin, if there is any.
+		// A reference origin is a trusted origin that this origin is
+		// derived from to some degree.
+		OriginPtr referenceOrigin;
 };
 
 

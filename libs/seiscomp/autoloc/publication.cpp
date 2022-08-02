@@ -49,6 +49,9 @@ bool Autoloc3::_report(const Autoloc::DataModel::Origin *origin)
 	ci.setCreationTime(now());
 	scorigin->setCreationInfo(ci);
 
+	SEISCOMP_DEBUG ("Reporting origin:");
+	SEISCOMP_DEBUG_S(printDetailed(origin));
+
 	return _report(scorigin.get());
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -127,7 +130,10 @@ void Autoloc3::report()
 					// TODO: make 150 configurable
 
 					// ... some more robust criteria perhaps
-					SEISCOMP_INFO("Origin %ld not sent (no improvement)", origin->id);
+					SEISCOMP_INFO(
+						"Origin %ld not sent "
+						"(no improvement)",
+						origin->id);
 					_outgoing.erase(id);
 					continue;
 				}
@@ -207,34 +213,38 @@ bool Autoloc3::_publishable(const Autoloc::DataModel::Origin *origin) const
 	using namespace Autoloc::DataModel;
 
 	if (origin->quality.aziGapSecondary > _config.maxAziGapSecondary) {
-		SEISCOMP_INFO("Origin %ld not sent (too large SGAP of %3.0f > %3.0f)",
-			      origin->id, origin->quality.aziGapSecondary, _config.maxAziGapSecondary);
+		SEISCOMP_INFO(
+			"Origin %ld not sent (too large SGAP of %3.0f > %3.0f)",
+			origin->id, origin->quality.aziGapSecondary,
+			_config.maxAziGapSecondary);
 		return false;
 	}
 
 	if (origin->score < _config.minScore) {
-		SEISCOMP_INFO("Origin %ld not sent (too low score of %.1f < %.1f)",
-			      origin->id, origin->score, _config.minScore);
+		SEISCOMP_INFO(
+			"Origin %ld not sent (too low score of %.1f < %.1f)",
+			origin->id, origin->score, _config.minScore);
 		return false;
 	}
 
 	if (origin->rms() > _config.maxRMS) {
-		SEISCOMP_INFO("Origin %ld not sent (too large RMS of %.1f > %.1f)",
-			      origin->id, origin->rms(), _config.maxRMS);
+		SEISCOMP_INFO(
+			"Origin %ld not sent (too large RMS of %.1f > %.1f)",
+			origin->id, origin->rms(), _config.maxRMS);
 		return false;
 	}
 
 
 	if (origin->dep > _config.maxDepth) {
-		SEISCOMP_INFO("Origin %ld too deep: %.1f km > %.1f km (maxDepth)",
-			      origin->id, origin->dep, _config.maxDepth);
+		SEISCOMP_INFO(
+			"Origin %ld too deep: %.1f km > %.1f km (maxDepth)",
+			origin->id, origin->dep, _config.maxDepth);
 		return false;
 	}
 
 	return true;
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
 
 
 }  // namespace Autoloc
