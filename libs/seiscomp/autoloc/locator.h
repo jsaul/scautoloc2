@@ -34,7 +34,8 @@ class MySensorLocationDelegate : public Seiscomp::Seismology::SensorLocationDele
 	public:
 		~MySensorLocationDelegate();
 	public:
-		virtual Seiscomp::DataModel::SensorLocation* getSensorLocation(Seiscomp::DataModel::Pick *pick) const;
+		virtual Seiscomp::DataModel::SensorLocation*
+			getSensorLocation(Seiscomp::DataModel::Pick *pick) const;
 		void setStation(const Autoloc::DataModel::Station *station);
 	private:
 		typedef std::map<std::string, Seiscomp::DataModel::SensorLocationPtr> SensorLocationList;

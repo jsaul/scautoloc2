@@ -228,8 +228,10 @@ void AutolocApp::createCommandLineDescription() {
 	commandline().addOption(
 		"Settings", "use-imported-origins",
 		"allow use of imported origins from trusted agencies as "
-		"configured in 'processing.whitelist.agencies'. Imported "
-		"origins are not relocated and only used for phase association");
+		"configured in 'processing.whitelist.agencies");
+	commandline().addOption(
+		"Settings", "adopt-imported-origin-depth",
+		"adopt the depths of imported origins");
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -290,6 +292,9 @@ bool AutolocApp::validateParameters()
 
 	if ( commandline().hasOption("use-imported-origins") )
 		_config.useImportedOrigins = true;
+
+	if ( commandline().hasOption("adopt-imported-origin-depth") )
+		_config.adoptImportedOriginDepth = true;
 
 	if ( commandline().hasOption("try-default-depth") )
 		_config.tryDefaultDepth = true;
@@ -563,6 +568,12 @@ bool AutolocApp::initConfiguration()
 	catch (...) {}
 
 	try {
+		_config.adoptImportedOriginDepth =
+			configGetBool("autoloc.adoptImportedOriginDepth");
+	}
+	catch (...) {}
+
+	try {
 		_wakeUpTimout =
 			configGetInt("autoloc.wakeupInterval");
 	}
@@ -695,7 +706,8 @@ bool AutolocApp::initConfiguration()
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 bool AutolocApp::init()
 {
-	if ( ! Client::Application::init() ) return false;
+	if ( ! Client::Application::init() )
+		return false;
 
 	_inputPicks = addInputObjectLog("pick");
 	_inputAmps = addInputObjectLog("amplitude");

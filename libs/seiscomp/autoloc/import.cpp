@@ -157,11 +157,14 @@ SEISCOMP_ERROR("CODE TEMPORARILY COMMENTED OUT");
 			// FIXME: This may also happen after Autoloc cleaned up
 			//        older picks, so the pick isn't available any more!
 			// TODO: Use Cache here!
-			SEISCOMP_ERROR_S("Pick " + pickID +
-					 " not found in internal pick pool - SKIPPING this pick");
+			SEISCOMP_ERROR_S(
+				"Pick " + pickID + " not found in "
+				"internal pick pool - SKIPPING this pick");
 			if (Seiscomp::DataModel::PublicObject::Find(pickID)) {
-				SEISCOMP_ERROR("HOWEVER, this pick is present in pool of public objects");
-				SEISCOMP_ERROR("Are you doing an XML playback?");
+				SEISCOMP_ERROR(
+					"HOWEVER, this pick is present in "
+					"pool of public objects. "
+					"Are you doing an XML playback?");
 			}
 
 			// This actually IS an error but we try to work around
@@ -241,13 +244,18 @@ SEISCOMP_ERROR("CODE TEMPORARILY COMMENTED OUT");
 			// than nothing.
 			// TODO: Make this behavior configurable?
 			origin->depthType = Autoloc::DataModel::Origin::DepthManuallyFixed;
-			SEISCOMP_WARNING("Treating depth as if it was manually fixed");
+			SEISCOMP_WARNING(
+				"Treating depth as if it was manually fixed");
 		}
 		else {
 			origin->depthType = Autoloc::DataModel::Origin::DepthFree;
 			SEISCOMP_WARNING("Leaving depth free");
 		}
 	}
+
+	// mark and log imported/manual origin
+	origin->imported = ( objectAgencyID(scorigin) != _config.agencyID );
+	origin->manual   =   manual(scorigin);
 
 	return origin;
 }

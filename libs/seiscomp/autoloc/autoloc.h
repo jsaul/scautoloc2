@@ -213,7 +213,6 @@ class Autoloc3 {
 
 	private:
 		// Import a Seiscomp::DataModel::Origin
-		//
 		Autoloc::DataModel::Origin *importFromSC(
 			const Seiscomp::DataModel::Origin *trustedOrigin);
 
@@ -234,6 +233,8 @@ class Autoloc3 {
 		bool _processImportedOrigin(Autoloc::DataModel::Origin*);
 		bool _processManualOrigin(Autoloc::DataModel::Origin*);
 
+		// _processImportedOrigin + _processManualOrigin
+		bool _processQualifiedOrigin(Autoloc::DataModel::Origin*);
 
 		// If the pick is an XXL pick, try to see if there are more
 		// XXL picks possibly giving rise to a preliminary origin
@@ -284,13 +285,40 @@ class Autoloc3 {
 		// True if pick comes with valid station info
 		bool _addStationInfo(const Autoloc::DataModel::Pick*);
 
-		// Feed pick to nucleator and return a new origin or NULL
+		// If the pick in the argument supersedes another
+		// pick, return the other pick.
+		const Autoloc::DataModel::Pick *supersedesAnotherPick(
+			const Autoloc::DataModel::Pick*);
+
+		// Try to supersede an existing pick with this pick.
+		// The existing pick may be associated to an origin
+		// and in that case the origin is returned. If no
+		// pick was superseded or an unassociated pick was
+		// superseded, then NULL is returned.
+		//
+		// Returns either an updated origin or NULL.
+		Autoloc::DataModel::OriginPtr _trySupersede(
+			const Autoloc::DataModel::Pick*);
+
+		// Try to nucleate a new origin using this pick.
+		// Currently the nucleator is a grid search.
+		//
+		// Returns either an updated origin or NULL.
 		Autoloc::DataModel::OriginPtr _tryNucleate(
 			const Autoloc::DataModel::Pick*);
 
-		// Feed pick to nucleator and return a new origin or NULL
+		// Try to associate one pick to an existing origin
+		//
+		// Returns either an updated origin or NULL.
 		Autoloc::DataModel::OriginPtr _tryAssociate(
 			const Autoloc::DataModel::Pick*);
+
+		// Try to generate a new origins using XXL picks.
+		//
+		// Returns either a new origin or NULL.
+		Autoloc::DataModel::OriginPtr _tryXXL(
+			const Autoloc::DataModel::Pick*);
+
 
 		// One last check before the origin is accepted.
 		// doesn't modify the origin
@@ -308,15 +336,27 @@ class Autoloc3 {
 		// and false otherwise.
 		bool storeInPool(const Autoloc::DataModel::Pick*);
 
-		// Store an origin in origin pool
+		// Rework the origin.
+		// Try hard to improve the origin, incl. relocations.
+		bool _rework(Autoloc::DataModel::Origin*);
+
+		// Polish the origin:
+		// - rename P to PKP where needed
+		// - compute score, rms etc.
+		// No relocation is performed here!
+		bool _polish(Autoloc::DataModel::Origin*);
+
+		// Store an origin in origin pool.
 		bool _store(Autoloc::DataModel::Origin*);
 
-		// Try to find and add more matching picks to origin
+		// Try to associate more matching picks to origin.
+		// There may be more phases to associate e.g. due to
+		// a change in location.
 		bool _addMorePicks(
 			Autoloc::DataModel::Origin*, bool keepDepth=false);
 
-		// Try to associate a pick to an origin
-		// true if successful
+		// Associate a pick to an origin and refine the new origin.
+		// Returns true if the association was successful.
 		bool _associate(
 			      Autoloc::DataModel::Origin*,
 			const Autoloc::DataModel::Pick*,
@@ -358,20 +398,21 @@ class Autoloc3 {
 			const Autoloc::DataModel::Origin*) const;
 
 		// For convenience. Checks whether a residual is within bounds.
+		// The factors allow stretching the range somewhat, e.g. for
+		// more generous residuals during association.
 		// TODO: Later this shall accomodate distance dependent limits.
-		// The factor allows somewhat more generous residuals e.g.
-		// for association.
-		bool _residualOK(
+		bool _residualWithinAllowedRange(
 			const Autoloc::DataModel::Arrival&,
 			double minFactor=1, double maxFactor=1) const;
 
-		// Don't allow Arrivals with residual > maxResidual. This
-		// criterion is currently enforced mercilessly, without
-		// allowing for asymmetry. What you specify (maxResidual) is
-		// what you get.
+		// Don't allow Arrivals with too large residual, namely,
+		// residuals that exceed the value configured in
+		// 'autoloc.maxResidual'.
 		//
-		// NOTE that the behavior is partly controlled through
-		// the configuration of _relocator
+		// NOTE that
+		// (1) a relocation is performed after trimming a residual
+		// (2) the behavior is partly controlled through the
+		//     configuration of _relocator
 		bool _trimResiduals(Autoloc::DataModel::Origin*);
 
 		bool _log(const Autoloc::DataModel::Pick*);
@@ -396,7 +437,6 @@ class Autoloc3 {
 
 		bool _associated(const Autoloc::DataModel::Pick*) const;
 
-		bool _rework(Autoloc::DataModel::Origin*);
 
 		void _ensureConsistentArrivals(Autoloc::DataModel::Origin*);
 
@@ -417,10 +457,18 @@ class Autoloc3 {
 		Autoloc::DataModel::Origin *_xxlFindEquivalentOrigin(
 			const Autoloc::DataModel::Origin*);
 
-		// for a newly fed origin, find an equivalent internal origin
-		Autoloc::DataModel::Origin *_findMatchingOrigin(
-			const Autoloc::DataModel::Origin*);
+		// For a newly fed manual origin, find an equivalent internal
+		// origin based on pick matches.
+		Autoloc::DataModel::OriginID _findMatchingOrigin(
+			const Autoloc::DataModel::Origin*) const;
 
+		// For a newly fed manual origin, find an equivalent internal
+		// origin based on pick matches. This searches for matching
+		// picks and counts the origins pointed to by matching picks.
+		// The origin pointed to by most picks is the one we are
+		// looking for.
+		Autoloc::DataModel::OriginID _findMatchingOriginViaPicks(
+			const Autoloc::DataModel::Origin*) const;
 
 	private:
 		Associator _associator;
@@ -462,6 +510,11 @@ class Autoloc3 {
 		std::vector<std::string> _trackedPicks;
 
 		bool processingEnabled;
+
+		// We normally ignore picks from disabled stations. However, in
+		// case of specially qualified origins it might make sense to
+		// add an exception.
+		bool associateDisabledStationsToQualifiedOrigin;
 };
 
 

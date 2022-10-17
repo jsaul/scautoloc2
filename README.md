@@ -2,9 +2,22 @@
 
 This repository contains the development version of scautoloc.
 
-The goal of the development version is to be able to run two
-versions of scautoloc in parallel. This is the reason why this
-separate repository was created after starting with the
+The goal of this development version is a comprehensive rework of
+`scautoloc`:
+
+* Move most functionality to a library
+* Expose the library functions as Python wrappers
+* Fixes of known bugs
+* Processing of automatic picks from more than one picker.
+* Code cleanups
+
+Some of the new developments, especially bug fixes, are planned to
+be ported back to the main branch, which will not be abandoned for
+quite a while. However, the ultimate goal is to replace `scautoloc`
+by `scautoloc2` at some point.
+
+In order to be able to run the two versions of scautoloc in parallel,
+this separate repository was created after starting with the
 [scautoloc-improvements](https://github.com/SeisComP/main/tree/scautoloc-improvements)
 branch. After installation, there will be `scautoloc2` in addition
 to `scautoloc`. Please note that if you don't want the origins
@@ -12,20 +25,6 @@ created by `scautoloc2` to become preferred in your production
 workflow, you need to configure `scevent` accordingly. Otherwise you
 will end up with a parallel history of origins, each of which can
 become preferred.
-
-The goal of this development version is a general rework of
-`scautoloc`.
-
-* Move most functionality to a library
-* Expose the library functions as Python wrappers
-* Code cleanups
-* Fixes of known bugs
-* Processing of automatic picks from more than one picker.
-
-Some of the new development, especially bug fixes, are planned to be
-ported back to the main branch, which will not be abandoned.
-However, the ultimate goal is to replace `scautoloc` by
-`scautoloc2` at some point.
 
 
 # Build

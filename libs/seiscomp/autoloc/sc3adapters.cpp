@@ -105,8 +105,9 @@ Seiscomp::DataModel::Origin *exportToSC(
 		const Autoloc::DataModel::Arrival &arr = origin->arrivals[i];
 
 		// If not all (automatic) phases are requested, only include P and PKP
-		if ( !allPhases && automatic(arr.pick.get()) && arr.phase != "P" && arr.phase != "PKP") {
-			SEISCOMP_DEBUG_S("SKIPPING 1  "+arr.pick->id);
+		if ( ! allPhases && automatic(arr.pick.get())
+		     && arr.phase != "P" && ! isPKP(arr.phase)) {
+			SEISCOMP_DEBUG_S("SKIPPING 1  "+arr.pick->id());
 			continue;
 		}
 
@@ -115,24 +116,27 @@ Seiscomp::DataModel::Origin *exportToSC(
 
 		// if (arr.excluded && fabs(arr.residual) > 30.) {
 		// 	// FIXME: quick+dirty fix
-		// 	SEISCOMP_DEBUG_S("SKIPPING 1  "+arr.pick->id);
+		// 	SEISCOMP_DEBUG_S("SKIPPING 1  "+arr.pick->id());
 		// 	continue;
 		// }
 
 		const Seiscomp::DataModel::Phase phase(arr.phase);
 		Seiscomp::DataModel::ArrivalPtr scarr
 		    = new Seiscomp::DataModel::Arrival();
-		scarr->setPickID(   arr.pick->id);
+		scarr->setPickID(   arr.pick->id());
 		scarr->setDistance( arr.distance);
 		scarr->setAzimuth(  arr.azimuth);
 		scarr->setTimeResidual(arr.residual);
-		scarr->setTimeUsed( arr.excluded == Autoloc::DataModel::Arrival::NotExcluded);
-		scarr->setWeight(   arr.excluded == Autoloc::DataModel::Arrival::NotExcluded ? 1. : 0.);
+		scarr->setTimeUsed(
+			arr.excluded == Autoloc::DataModel::Arrival::NotExcluded);
+		scarr->setWeight(
+			arr.excluded == Autoloc::DataModel::Arrival::NotExcluded ? 1. : 0.);
 		scarr->setPhase(phase);
 
 		// This is practically impossible
 		if ( arr.pick->scpick == NULL ) {
-			SEISCOMP_ERROR_S("CRITICAL: pick not found: "+arr.pick->id);
+			SEISCOMP_ERROR_S(
+				"CRITICAL: pick not found: "+arr.pick->id());
 			return NULL;
 		}
 

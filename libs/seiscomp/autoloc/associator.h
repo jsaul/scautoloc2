@@ -61,6 +61,12 @@ class Associator
 		void setPickPool(const Autoloc::DataModel::PickPool*);
 
 	public:
+		// Get a rough idea if the pick *might* be assiciated to
+		// the origin.
+		bool mightBeAssociated(
+			const Autoloc::DataModel::Pick *pick,
+			const Autoloc::DataModel::Origin *origin) const;
+	public:
 		// Feed a pick and try to associate it with known origins, under the
 		// assumption that this is a P pick.
 		//
@@ -91,8 +97,17 @@ class Associator
 			AssociationVector &associations) const;
 
 	private:
-		bool findPhaseRange(const std::string &code, PhaseRange &) const;
+		// Find a matching PhaseRange for the phase with the given
+		// code. That code may be a literal or a generic name.
+		//
+		// If no matchingPhaseRange was found, true is returned,
+		// otherwise false.
+		bool __OBSOLETE__findPhaseRange(
+			const std::string &code, PhaseRange &result) const;
 
+		bool inRange(
+			const std::string &code,
+			double delta, double depth) const;
 	public:
 		void reset();
 		void shutdown();
@@ -102,6 +117,11 @@ class Associator
 		const Autoloc::DataModel::StationMap *_stations;
 		const Autoloc::DataModel::OriginVector *_origins;
 		const Autoloc::DataModel::PickPool *pickPool;
+
+	private:
+		// config
+		bool considerDisabledStations;
+		bool associateDisabledStationsToQualifiedOrigin;
 
 	private:
 		PhaseRangeVector _phaseRanges;

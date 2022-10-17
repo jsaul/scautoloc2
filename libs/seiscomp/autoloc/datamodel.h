@@ -19,6 +19,7 @@
 #include <vector>
 
 #include <seiscomp/core/baseobject.h>
+#include <seiscomp/datamodel/station.h>
 #include <seiscomp/datamodel/origin.h>
 #include <seiscomp/datamodel/pick.h>
 #include <seiscomp/datamodel/amplitude.h>
@@ -29,7 +30,7 @@ namespace Autoloc {
 
 namespace DataModel {
 
-typedef unsigned long OriginID;
+typedef size_t OriginID;
 typedef double Time;
 
 
@@ -38,10 +39,10 @@ DEFINE_SMARTPOINTER(Station);
 class Station : public Seiscomp::Core::BaseObject {
 
 	public:
-
 		Station(const Seiscomp::DataModel::Station*);
 
 		std::string code, net;
+		std::string loc; // to be used in the future
 		double lat, lon, alt;
 
 		// Max. nucleation distance
@@ -69,37 +70,49 @@ class Pick;
 class Pick : public Seiscomp::Core::BaseObject {
 
 	public:
-		typedef enum { Automatic, Manual, Confirmed, IgnoredAutomatic } Status;
+		typedef enum {
+			Automatic,
+			Manual,
+			Confirmed,
+			IgnoredAutomatic
+		} Status;
 
 	public:
 
 		Pick(const Seiscomp::DataModel::Pick*);
-//		Pick(const Pick &other);
 		~Pick();
 
 		static int count();
 
-		/* const */ std::string id, net, sta, loc, cha;
+		// Attached SC objects. The pick must never be null.
+		Seiscomp::DataModel::PickCPtr      scpick;
+		Seiscomp::DataModel::AmplitudeCPtr scamplAbs;
+		Seiscomp::DataModel::AmplitudeCPtr scamplSNR;
 
-/*
-		std::string id() {
+		const std::string& id() const {
 			return scpick->publicID();
 		}
-		std::string net() {
+
+		const std::string& net() const {
 			return scpick->waveformID().networkCode();
 		}
-		std::string sta() {
+
+		const std::string& sta() const {
 			return scpick->waveformID().stationCode();
 		}
-		std::string loc() {
+
+		const std::string& loc() const {
 			return scpick->waveformID().locationCode();
 		}
-		std::string cha() {
+
+		const std::string& cha() const {
 			return scpick->waveformID().channelCode();
 		}
-*/
 
-		const Station *station() const { return _station.get(); }
+		const Station *station() const {
+			return _station.get();
+		}
+
 		void setStation(const Station *sta) const;
 
 		// sets the amplitude to either the SNR or absolute amplitude
@@ -107,8 +120,8 @@ class Pick : public Seiscomp::Core::BaseObject {
 		void setAmplitudeAbs(const Seiscomp::DataModel::Amplitude*);
 
 		// get and set the origin this pick is associated with
-		const Origin *origin() const { return _origin.get(); }
-		void setOrigin(const Origin *org) const;
+		OriginID originID() const;
+		void setOriginID(OriginID originID) const;
 
 		Time time;	// pick time
 		float amp;	// linear amplitude
@@ -121,15 +134,15 @@ class Pick : public Seiscomp::Core::BaseObject {
 		Time creationTime;
 
 		mutable bool blacklisted;
-
-		// Attached SC objects. The pick must never be null.
-		Seiscomp::DataModel::PickCPtr      scpick;
-		Seiscomp::DataModel::AmplitudeCPtr scamplAbs;
-		Seiscomp::DataModel::AmplitudeCPtr scamplSNR;
+		mutable int priority;
 
 	private:
-		mutable OriginPtr  _origin; // The (one and only) origin this pick is associated to
-		mutable StationPtr _station;	// Station information
+		// The (one and only) origin this pick is associated to
+//		mutable OriginPtr _origin;
+		mutable OriginID _originID;
+
+		// Station information
+		mutable StationPtr _station;
 };
 
 
@@ -148,7 +161,7 @@ class Hypocenter : public Seiscomp::Core::BaseObject {
 class Arrival {
 
 	public:
-
+		Arrival();
 		Arrival(const Pick *pick, const std::string &phase="P", double residual=0);
 		Arrival(const Origin *origin, const Pick *pick, const std::string &phase="P", double residual=0, double affinity=1);
 		Arrival(const Arrival &);
@@ -190,7 +203,10 @@ class Arrival {
 
 			// pick temporarily excluded from the computation
 			// XXX experimental XXX
-			TemporarilyExcluded = 32
+			TemporarilyExcluded = 32,
+
+			// pick has been blacklisted
+			BlacklistedPick = 64
 		};
 
 		ExcludeReason excluded;
@@ -227,7 +243,11 @@ class OriginError
 class Origin : public Hypocenter {
 
 	public:
-		enum ProcessingStatus { New, Updated, Deleted };
+		enum ProcessingStatus {
+			New,
+			Updated,
+			Deleted
+		};
 
 		enum LocationStatus {
 			// purely automatic
@@ -271,9 +291,19 @@ class Origin : public Hypocenter {
 
 		void updateFrom(const Origin*);
 
+		// Add an arrival to the origin. This checks if the pick
+		// references by the arrival is already associated to the
+		// origin and if so, the arrival is not added and false is
+		// returned. Upon success, true is returned.
 		bool add(const Arrival &arr);
 
-		// Return index of arrival referencing pick, -1 if not found
+		// Adopt a pick. This means that the origin assumes
+		// "ownership" of this pick, which prevents it to be "owned"
+		// by another origin.
+		bool adopt(const Pick *pick) const;
+
+		// Return index of arrival referencing the exact same pick
+		// or -1 if not found
 		int findArrival(const Pick *pick) const;
 
 		// Count the defining phases, optionally within a distance range
@@ -284,6 +314,7 @@ class Origin : public Hypocenter {
 		int definingStationCount() const;
 		int associatedStationCount() const;
 
+		// Compute the pick RMS for all picks used in the solution.
 		double rms() const;
 
 		// Compute the median station distance.
@@ -299,7 +330,12 @@ class Origin : public Hypocenter {
 		OriginID id;
 
 		bool imported;
+		bool manual;
 		bool preliminary;
+
+		// A locked origin cannot be relocated.
+		bool locked; 
+
 		std::string publicID;
 
 		std::string methodID;
@@ -334,24 +370,28 @@ class OriginVector : public std::vector<OriginPtr> {
 
 		// Return origin with the origin ID if found, NULL otherwise
 		Origin *find(const OriginID &id);
+		const Origin *find(const OriginID &id) const;
 
-		// Try to find the best Origin which possibly belongs to the same event
+		// Try to find the best Origin which possibly belongs to the
+		// same event
 		const Origin *bestEquivalentOrigin(const Origin *start) const;
 
-		// Try to find Origins which possibly belong to the same event and try
-		// to merge the picks
+		// Try to find Origins which possibly belong to the same
+		// event and try to merge the picks
 		int mergeEquivalentOrigins(const Origin *start=0);
 };
 
 
 DEFINE_SMARTPOINTER(Event);
 
+/*
 class Event : public Seiscomp::Core::BaseObject {
 
 	public:
 
 		OriginVector origin;
 };
+*/
 
 
 typedef std::map<std::string, Autoloc::DataModel::PickCPtr> PickPool;

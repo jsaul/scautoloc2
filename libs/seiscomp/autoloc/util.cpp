@@ -115,40 +115,10 @@ std::string printOneliner(const Autoloc::DataModel::Origin *origin)
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool travelTimeP(
-	double lat1, double lon1, double dep1,
-	double lat2, double lon2, double alt2,
-	TravelTime &tt)
-{
-	static std::string P("P");
-	return travelTime(lat1, lon1, dep1, lat2, lon2, alt2, P, tt);
-}
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
-
-
-// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool travelTimeP(
-	const Autoloc::DataModel::Hypocenter *origin,
-        const Autoloc::DataModel::Station *station,
-	TravelTime &tt)
-{
-	return travelTimeP(
-		origin->lat, origin->lon, origin->dep,
-		station->lat, station->lon, station->alt,
-		tt);
-}
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
-
-
-// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 bool travelTime(
 	double lat1, double lon1, double dep1,
 	double lat2, double lon2, double alt2,
-	const std::string &code,
+	const std::string &phase,
 	TravelTime &tt)
 {
 	static Seiscomp::TravelTimeTable ttt;
@@ -156,29 +126,53 @@ bool travelTime(
 	Seiscomp::TravelTimeList
 		*ttlist = ttt.compute(lat1, lon1, dep1, lat2, lon2, alt2);
 
+	bool wantFirstPKP = (phase=="PKP");
+
 	double delta = distance(lat1, lon1, lat2, lon2);
 
 	// At a frequency dependent distance Pdiff fades and PKP becomes
 	// the first arrival. We don't know the frequency so we must cut
 	// Pdiff somewhere. This is the max. Pdiff distance in degrees.
-	double maxPdiffDelta = 114;
+	//
+	// FIXME: We hard code this distance limit due to Pdiff extending
+	// beyond 120 deg at low frequencies but we don't want to use Pdiff
+	// from that far.
+	double maxPdiffDelta = 115;
 
 	// for  distances < maxPdiffDelta, always take 1st arrival
-	bool useFirstArrival = (code == "P" && delta < maxPdiffDelta);
+	bool useFirstArrival = false;
+
+	if (phase == "P1") {
+		if (delta < maxPdiffDelta)
+			useFirstArrival = true;
+		else
+			wantFirstPKP = true;
+	}
+	// other phase codes are taken at face value
+
 
 	for (TravelTime &t : *ttlist) {
 		tt = t;
+
+		// generic P
 		if (useFirstArrival)
 			break;
-		if (tt.phase.substr(0,2) != "PK")
-			// for  distances >= maxPdiffDelta, skip Pdiff etc. and
-			// take first of PKP*, PKiKP* FIXME: a bit crude
-			continue;
-		break;
+
+		// generic PKP
+		if (wantFirstPKP && isPKP(tt.phase))
+			break;
+
+		// exact match
+		if (tt.phase == phase)
+			break;
+
+		// mark item as invalid
+		tt.time = -1;
 	}
 	delete ttlist;
 
-	return true;
+	// return true if the found item is valid
+	return tt.time >= 0;
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -189,13 +183,13 @@ bool travelTime(
 bool travelTime(
 	const Autoloc::DataModel::Hypocenter *origin,
         const Autoloc::DataModel::Station *station,
-	const std::string &code,
+	const std::string &phase,
 	TravelTime &tt)
 {
-	return travelTimeP(
+	return travelTime(
 		origin->lat, origin->lon, origin->dep,
 		station->lat, station->lon, station->alt,
-		tt);
+		phase, tt);
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -234,6 +228,30 @@ double meandev(const Autoloc::DataModel::Origin* origin)
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
+static std::string excludedFlag(int status)
+{
+			switch(status) {
+			case Autoloc::DataModel::Arrival::NotExcluded:
+				return "  ";
+			case Autoloc::DataModel::Arrival::LargeResidual:
+				return "Xr";
+			case Autoloc::DataModel::Arrival::StationDistance:
+				return "Xd";
+			case Autoloc::DataModel::Arrival::ManuallyExcluded:
+				return "Xm";
+			case Autoloc::DataModel::Arrival::UnusedPhase:
+				return "Xp";
+			case Autoloc::DataModel::Arrival::DeterioratesSolution:
+				return "X!";
+			case Autoloc::DataModel::Arrival::TemporarilyExcluded:
+				return "Xt";
+			case Autoloc::DataModel::Arrival::BlacklistedPick:
+				return "Xb";
+			default:
+				return "X ";
+			}
+				return "X ";
+}
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -241,7 +259,7 @@ std::string printOrigin(
 	const Autoloc::DataModel::Origin *origin,
 	bool oneliner)
 {
-	if (origin==NULL)
+	if (origin==nullptr)
 		return "invalid origin";
 
 	std::ostringstream out;
@@ -278,6 +296,8 @@ std::string printOrigin(
 			origin->rms(), origin->definingPhaseCount(),
 			(unsigned long)origin->arrivals.size(),score);
 		out << s;
+// TEMP
+out << (origin->locked ? " locked=yes" : " locked=no ");
 	}
 	else {
 		out << "Detailed info for Origin " << origin->id << std::endl
@@ -294,34 +314,9 @@ std::string printOrigin(
 			const Autoloc::DataModel::Arrival &arr = origin->arrivals[i];
 			const Autoloc::DataModel::Pick* pick = arr.pick.get();
 
-			std::string excludedFlag;
-			switch(arr.excluded) {
-			case Autoloc::DataModel::Arrival::NotExcluded:
-				excludedFlag = "  ";
-				break;
-			case Autoloc::DataModel::Arrival::LargeResidual:
-				excludedFlag = "Xr";
-				break;
-			case Autoloc::DataModel::Arrival::StationDistance:
-				excludedFlag = "Xd";
-				break;
-			case Autoloc::DataModel::Arrival::ManuallyExcluded:
-				excludedFlag = "Xm";
-				break;
-			case Autoloc::DataModel::Arrival::UnusedPhase:
-				excludedFlag = "Xp";
-				break;
-			case Autoloc::DataModel::Arrival::DeterioratesSolution:
-				excludedFlag = "X!";
-				break;
-			case Autoloc::DataModel::Arrival::TemporarilyExcluded:
-				excludedFlag = "Xt";
-				break;
-			default:
-				excludedFlag = "X ";
-			}
 			if ( ! pick->station()) {
-				out << pick->id << "   missing station information" << std::endl;
+				// FIXME: This is actually a fatal error!
+				out << pick->id() << "   missing station information" << std::endl;
 				continue;
 			}
 
@@ -336,23 +331,24 @@ std::string printOrigin(
 			out	<< std::right << std::fixed << std::setw(6) << arr.distance;
 			out.precision(0);
 			out	<< std::setw(4) << arr.azimuth
-				<< std::left << " "
+				<< std::left << ' '
 				<< std::setw(11) << time2str(pick->time).substr(11);
 			out.precision(1);
 			out	<< std::right
 				<< std::setiosflags(std::ios::fixed)
-				<< std::setw(6) << arr.residual << " "
-				<< ((arr.pick->status == Autoloc::DataModel::Pick::Automatic) ?"A":"M") // << " "
-				<< excludedFlag << " "
-				<< std::left << std::setw(6) << arr.phase << " "
-				<< (arr.pick->xxl ? "XXL":"   ");
+				<< std::setw(6) << arr.residual << ' '
+				<< (automatic(pick) ? 'A' : 'M')
+				<< excludedFlag(arr.excluded) << ' '
+				<< std::left << std::setw(6) << arr.phase << ' '
+				<< (pick->xxl ? "XXL":"   ");
 //			out.precision(1);
 //			out	<< "  " << std::right << std::fixed << std::setw(8) << arr.pick->snr;;
 			out.precision(2);
-			out	<< " " << arr.score << " -";
-			out	<< " " << arr.tscore;
-			out	<< " " << arr.ascore;
-			out	<< " " << arr.dscore;
+			out	<< ' ' << arr.score << " -";
+			out	<< ' ' << arr.tscore;
+			out	<< ' ' << arr.ascore;
+			out	<< ' ' << arr.dscore;
+			out	<< ' ' << pick->id();
 			out	<< std::endl;
 		}
 
@@ -364,6 +360,7 @@ std::string printOrigin(
 		out << "SGAP  = " << origin->quality.aziGapSecondary << std::endl;
 		out << "SCORE = " << originScore(origin) << std::endl;
 		out << "preliminary = "  << (origin->preliminary ? "true":"false") << std::endl;
+		out << "locked = "  << (origin->locked ? "true":"false") << std::endl;
 
 		out.precision(precision);
 	}
@@ -481,7 +478,7 @@ double originScore(
 
 		double normamp = pick->normamp;
 		if (manual(pick.get()) && normamp <= 0)
-			normamp = 1; // make this configureable
+			normamp = 1; // make this configurable
 
 		double snrScore = log10(snr);
 
@@ -503,7 +500,7 @@ double originScore(
 				"THIS SHOULD NEVER HAPPEN: "
 				"pick %s with  normamp %g  amp %g "
 				"(not critical)",
-				pick->id.c_str(), normamp, pick->amp);
+				pick->id().c_str(), normamp, pick->amp);
 			continue;
 		}
 
@@ -647,7 +644,7 @@ bool valid(const Autoloc::DataModel::Pick *pick)
 	if ( ! pick->station()) {
 		SEISCOMP_WARNING(
 			"Pick %s without station info rejected",
-			pick->id.c_str());
+			pick->id().c_str());
 		return false;
 	}
 
@@ -663,14 +660,14 @@ bool valid(const Autoloc::DataModel::Pick *pick)
 	if (pick->snr <= 0 || pick->snr > 1.0E7) {
 		SEISCOMP_WARNING(
 			"Pick %s with snr of %g rejected",
-			pick->id.c_str(), pick->snr);
+			pick->id().c_str(), pick->snr);
 		return false;
 	}
 
 	if ( ! hasAmplitude(pick)) {
 		SEISCOMP_WARNING(
 			"Pick %s with missing amplitudes rejected",
-			pick->id.c_str());
+			pick->id().c_str());
 		return false;
 	}
 
@@ -682,9 +679,10 @@ bool valid(const Autoloc::DataModel::Pick *pick)
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-bool manual(const Seiscomp::DataModel::Origin *origin) {
+bool manual(const Seiscomp::DataModel::Origin *scorigin)
+{
 	try {
-		switch (origin->evaluationMode()) {
+		switch (scorigin->evaluationMode()) {
 		case Seiscomp::DataModel::MANUAL:
 			return true;
 		default:
@@ -693,6 +691,29 @@ bool manual(const Seiscomp::DataModel::Origin *origin) {
 	}
 	catch ( Seiscomp::Core::ValueException & ) {}
 	return false;
+}
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool manual(const Autoloc::DataModel::Origin *origin)
+{
+	return origin->manual;
+}
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool imported(const Autoloc::DataModel::Origin *origin)
+{
+	if (origin->referenceOrigin != nullptr)
+		return origin->referenceOrigin->imported;
+
+	return origin->imported;
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -721,6 +742,28 @@ int arrivalWithLargestResidual(const Autoloc::DataModel::Origin *origin)
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool isP(const std::string &phase)
+{
+	return (phase == "P"   || phase == "P1" ||
+		phase == "Pdiff" || phase == "Pdif" ||
+	        phase == "Pg" || phase == "Pb" || phase == "Pn");
+}
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool isPKP(const std::string &phase)
+{
+	return (phase == "PKP"   || phase == "PKPdf" ||
+	        phase == "PKPab" || phase == "PKPbc");
+}
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
 

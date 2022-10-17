@@ -65,8 +65,8 @@ void Config::dump() const
 	SEISCOMP_INFO("  playback                         %s",     playback ? "true":"false");
 	SEISCOMP_INFO("  useManualPicks                   %s",     useManualPicks ? "true":"false");
 	SEISCOMP_INFO("  useManualOrigins                 %s",     useManualOrigins ? "true":"false");
-// This isn't used still so we don't want to confuse the user....
-//	SEISCOMP_INFO("useImportedOrigins               %s",     useImportedOrigins ? "true":"false");
+	SEISCOMP_INFO("  useImportedOrigins               %s",     useImportedOrigins ? "true":"false");
+	SEISCOMP_INFO("  adoptImportedOriginDepth         %s",     adoptImportedOriginDepth ? "true":"false");
 	SEISCOMP_INFO("  locatorProfile                   %s",     locatorProfile.c_str());
 
 	if ( ! xxlEnabled) {

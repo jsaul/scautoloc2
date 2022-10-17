@@ -224,6 +224,7 @@ class Config {
 		bool useManualOrigins{false};
 //		bool adoptManualOriginsFixedDepth{true};
 		bool useImportedOrigins{false};
+		bool adoptImportedOriginDepth{false};
 
 		// enable the XXL feature
 		bool xxlEnabled{false};

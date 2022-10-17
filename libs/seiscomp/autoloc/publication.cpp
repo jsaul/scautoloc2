@@ -83,10 +83,13 @@ void Autoloc3::report()
 
 	int dnmax = _config.publicationIntervalPickCount;
 
-	for (std::map<int, OriginPtr>::iterator
-	     it = _outgoing.begin(); it != _outgoing.end(); ++it) {
+//	for (std::map<int, OriginPtr>::iterator
+//	     it = _outgoing.begin(); it != _outgoing.end(); ++it) {
+//
+//		const Origin *origin = it->second.get();
 
-		const Origin *origin = it->second.get();
+	for (auto &item: _outgoing) {
+		const Origin *origin = item.second.get();
 		double dt = t - _nextDue[origin->id];
 		int dn = dnmax;
 

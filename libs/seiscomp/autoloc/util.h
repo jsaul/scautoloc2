@@ -68,15 +68,6 @@ double avgfn(double x);
 
 // Compute the P travel time between two points on a spherical Earth.
 typedef Seiscomp::TravelTime TravelTime;
-bool travelTimeP (
-	double lat1, double lon1, double dep1,
-	double lat2, double lon2, double alt2,
-	TravelTime&);
-
-bool travelTimeP (
-	const Autoloc::DataModel::Hypocenter*,
-	const Autoloc::DataModel::Station*,
-	TravelTime&);
 
 bool travelTime (
 	double lat1, double lon1, double dep1,
@@ -106,9 +97,23 @@ bool emptyLocationCode(const std::string &locationCode);
 
 bool valid(const Autoloc::DataModel::Pick *pick);
 
-bool manual(const Seiscomp::DataModel::Origin *origin);
+// Determine whether the specified SeisComP origin is a manual origin
+bool manual(const Seiscomp::DataModel::Origin *scorigin);
+
+// Determine whether the specified Autoloc origin is a manual origin
+bool manual(const Autoloc::DataModel::Origin *origin);
+
+// Determine whether the specified Autoloc origin is an imported origin
+bool imported(const Autoloc::DataModel::Origin *origin);
 
 int arrivalWithLargestResidual(const Autoloc::DataModel::Origin *origin);
+
+// Return true if the phase is one of P, Pg, Pb, Pn, Pdiff
+// Note that PKP is not included!
+bool isP(const std::string &phase);
+
+// Return true if the phase is one of the PKP branches
+bool isPKP(const std::string &phase);
 
 } // namespace Autoloc
 

@@ -221,7 +221,7 @@ Autoloc::DataModel::Origin *Locator::relocate(const Autoloc::DataModel::Origin *
 */
 
 
-	Origin* relo = _screlocate(origin);
+	Origin* relo = origin->locked ? nullptr : _screlocate(origin);
 	if (relo == NULL)
 		return NULL;
 
@@ -283,6 +283,7 @@ Autoloc::DataModel::Origin* Locator::_screlocate(const Autoloc::DataModel::Origi
 		releaseDepth();
 */
 
+/* OBSOLETE CODE
 	// Store SC Picks/Stations here so that they can be found
 	// by LocSAT via SC PublicObject lookup
 	std::vector<Seiscomp::DataModel::PublicObjectPtr> scobjects;
@@ -294,13 +295,16 @@ Autoloc::DataModel::Origin* Locator::_screlocate(const Autoloc::DataModel::Origi
 	for (const Autoloc::DataModel::Arrival &arr : origin->arrivals) {
 		const Seiscomp::DataModel::Phase phase(arr.phase);
 
-		Seiscomp::DataModel::PickPtr
-			scpick = Seiscomp::DataModel::Pick::Find(arr.pick->id);
+		Seiscomp::DataModel::PickCPtr
+			scpick = arr.pick->scpick;
+		//	scpick = Seiscomp::DataModel::Pick::Find(arr.pick->id());
 
 		if ( scpick == NULL ) {
-			scpick = Seiscomp::DataModel::Pick::Create(arr.pick->id);
+			// TODO: Review! Is this ever called?
+			scpick = Seiscomp::DataModel::Pick::Create(arr.pick->id());
 			if ( scpick == NULL ) {
-				SEISCOMP_ERROR_S("Locator::_screlocate(): Failed to create pick "+arr.pick->id+" - giving up");
+				SEISCOMP_ERROR_S(
+					"Locator::_screlocate(): Failed to create pick "+arr.pick->id()+" - giving up");
 				return NULL;
 			}
 			const Autoloc::DataModel::Station *sta = arr.pick->station();
@@ -311,18 +315,20 @@ Autoloc::DataModel::Origin* Locator::_screlocate(const Autoloc::DataModel::Origi
 			scpick->setPhaseHint(phase);
 			scpick->setEvaluationMode(Seiscomp::DataModel::EvaluationMode(Seiscomp::DataModel::AUTOMATIC));
 		}
-		scobjects.push_back(scpick);
-	}
 
+//		scobjects.push_back(scpick);
+	}
+*/
 
 	//
 	// try the actual relocation
 	//
-	Seiscomp::DataModel::OriginPtr screlo;
+	Seiscomp::DataModel::OriginPtr screlo = nullptr;
 	try {
 		// FIXME:
 		// Sometimes LocSAT appears to require a second
 		// invocation to produce a decent result. Reason TBD
+		
 		Seiscomp::DataModel::OriginPtr temp;
 		temp = sclocator->relocate(scorigin.get());
 		if ( ! temp) // FIXME
@@ -351,7 +357,8 @@ Autoloc::DataModel::Origin* Locator::_screlocate(const Autoloc::DataModel::Origi
 	// LocSAT being the same as in the input. If not, this is absolutely
 	// fatal.
 	//
-	Autoloc::DataModel::Origin *relo = new Autoloc::DataModel::Origin(*origin);
+	Autoloc::DataModel::Origin *relo =
+		new Autoloc::DataModel::Origin(*origin);
 	if ( ! relo)
 		return NULL;
 
@@ -400,13 +407,14 @@ Autoloc::DataModel::Origin* Locator::_screlocate(const Autoloc::DataModel::Origi
 
 	// FIXME: This depends on the precise alignment of the arrivals in
 	// relo and screlo. This is given but still somewhat error-prone.
-	for (int i=0; i<arrivalCount; i++) {
+	size_t arrivalCount = origin->arrivals.size();
+	for (size_t i=0; i<arrivalCount; i++) {
 		Autoloc::DataModel::Arrival &arr = relo->arrivals[i];
 		const std::string &pickID = screlo->arrival(i)->pickID();
 
-		if (arr.pick->id != pickID) {
-			// If this should ever happen, let it bang loudly!
-			SEISCOMP_ERROR("Locator: FATAL ERROR: Inconsistent arrival order");
+		if (arr.pick->id() != pickID) {
+			SEISCOMP_ERROR(
+				"FATAL ERROR: Inconsistent arrival order");
 			exit(1);
 		}
 
@@ -415,7 +423,7 @@ Autoloc::DataModel::Origin* Locator::_screlocate(const Autoloc::DataModel::Origi
 		arr.azimuth  = screlo->arrival(i)->azimuth();
 
 		if ( (arr.phase == "P" || arr.phase == "P1") && arr.distance > 115)
-			arr.phase = "PKP";
+			arr.phase = "PKP"; // TODO: rename to PKPdf etc.
 
 //		if (arr.residual == -999.)
 //			arr.residual = 0; // FIXME preliminary cosmetics;
@@ -427,7 +435,7 @@ Autoloc::DataModel::Origin* Locator::_screlocate(const Autoloc::DataModel::Origi
 		     arr.distance > 104 && arr.distance < 112) {
 
 			Seiscomp::TravelTime tt;
-			if ( ! travelTimeP(arr.distance, origin->dep, tt))
+			if ( ! travelTime(arr.distance, origin->dep, "P1", tt))
 				continue;
 			arr.residual = arr.pick->time - (origin->time + tt.time);
 		}

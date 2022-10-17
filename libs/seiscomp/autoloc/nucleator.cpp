@@ -423,7 +423,7 @@ bool GridPoint::setupStation(const Autoloc::DataModel::Station *station)
 		return false;
 
 	TravelTime tt;
-	if ( ! Autoloc::travelTimeP(lat, lon, dep, station->lat, station->lon, 0, tt))
+	if ( ! Autoloc::travelTime(lat, lon, dep, station->lat, station->lon, 0, "P1", tt))
 		return false;
 
 	StationWrapperCPtr sw = new StationWrapper(station, tt.phase, delta, az, tt.time, tt.dtdd);
@@ -489,16 +489,16 @@ bool GridSearch::feed(const Autoloc::DataModel::Pick *pick)
 		exit(1);
 	}
 
-	std::string net_sta = pick->net + "." + pick->sta;
+	std::string key = pick->net() + "." + pick->sta() + "." + pick->loc();
 
 	// link pick to station through pointer
 
 /*
 NOT NEEDED - a pick must have a station associated to it by now
 	if (pick->station() == 0) {
-		StationMap::const_iterator it = _stations.find(net_sta);
+		StationMap::const_iterator it = _stations.find(key);
 		if (it == _stations.end()) {
-			SEISCOMP_ERROR_S("\nGridSearch::feed() NO STATION " + net_sta + "\n");
+			SEISCOMP_ERROR_S("\nGridSearch::feed() NO STATION " + key + "\n");
 			return false;
 		}
 		SEISCOMP_ERROR("GridSearch::feed()  THIS SHOULD NEVER HAPPEN");
@@ -508,10 +508,10 @@ NOT NEEDED - a pick must have a station associated to it by now
 
 	// If not done already, set up the grid for this station now.
 	bool stationSetupNeeded = false;
-	if (_configuredStations.find(net_sta) == _configuredStations.end()) {
-		_configuredStations.insert(net_sta);
+	if (_configuredStations.find(key) == _configuredStations.end()) {
+		_configuredStations.insert(key);
 		stationSetupNeeded = true;
-		SEISCOMP_DEBUG_S("GridSearch: setting up station " + net_sta);
+		SEISCOMP_DEBUG_S("GridSearch: setting up station " + key);
 	}
 
 	std::map<PickSet, OriginPtr> pickSetOriginMap;
