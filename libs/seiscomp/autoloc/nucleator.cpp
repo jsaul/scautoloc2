@@ -314,10 +314,10 @@ GridPoint::feed(const Autoloc::DataModel::Pick* pick)
 			double azi_k = ppk.wrapper->azimuth;
 			double slo_k = ppk.wrapper->hslow;
 
-			double azi_diff = fabs(fmod(((azi_k-azi_i)+180.), 360.)-180.);
+			double azi_diff = std::abs(fmod(((azi_k-azi_i)+180.), 360.)-180.);
 			double dtmax = _radius*(slo_i+slo_k) * azi_diff/90. + dt0;
 
-			if (fabs(t_i-t_k) < dtmax) {
+			if (std::abs(t_i-t_k) < dtmax) {
 				_cnt[i]++;
 				_cnt[k]++;
 

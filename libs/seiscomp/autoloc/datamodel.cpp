@@ -38,7 +38,7 @@ Station::Station(const Seiscomp::DataModel::Station *scstation) {
 
 	const Seiscomp::DataModel::Network *scnetwork =
 		Seiscomp::DataModel::Network::Cast(scstation->parent());
-	if (scnetwork == NULL) {
+	if (scnetwork == nullptr) {
 		throw Seiscomp::Core::ValueException("Network is unset");
 	}
 
@@ -80,7 +80,7 @@ Pick::Pick(const Seiscomp::DataModel::Pick *scpick)
 	xxl = false;
 	blacklisted = false;
 	priority = 0;
-	_station = NULL;
+	_station = nullptr;
 	_originID = 0;
 
 	_pickCount++;
@@ -169,7 +169,7 @@ void Pick::setOriginID(OriginID originID) const
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 Arrival::Arrival()
-	: origin(NULL), pick(NULL), residual(0)
+	: origin(nullptr), pick(nullptr), residual(0)
 {
 	excluded = NotExcluded;
 	score = 0;
@@ -183,7 +183,7 @@ Arrival::Arrival()
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 Arrival::Arrival(const Pick *pick, const std::string &phase, double residual)
-	: origin(NULL), pick(pick), phase(phase), residual(residual)
+	: origin(nullptr), pick(pick), phase(phase), residual(residual)
 {
 	excluded = NotExcluded;
 	score = 0;
@@ -618,7 +618,8 @@ Origin* OriginVector::find(const OriginID &id)
 		if (id == (*it)->id)
 			return (*it).get();
 	}
-	return NULL;
+
+	return nullptr;
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -632,7 +633,7 @@ const Origin* OriginVector::find(const OriginID &id) const
 		if (id == (*it)->id)
 			return (*it).get();
 	}
-	return NULL;
+	return nullptr;
 }
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -670,7 +671,7 @@ const Origin *OriginVector::bestEquivalentOrigin(const Origin *origin) const
 		const double max_dt = 1500;
 		const Origin* this_origin = (*it).get();
 
-		if (fabs(this_origin->time - origin->time) > max_dt)
+		if (std::abs(this_origin->time - origin->time) > max_dt)
 			continue;
 
 		int commonPickCount = countCommonPicks(origin, this_origin);

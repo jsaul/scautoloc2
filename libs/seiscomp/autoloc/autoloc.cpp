@@ -508,7 +508,7 @@ bool Autoloc3::feed(const Autoloc::DataModel::Pick *pick)
 			continue;
 		if (existingPick->id() == pick->id())
 			continue;
-		double dt = fabs(existingPick->time - pick->time);
+		double dt = std::abs(existingPick->time - pick->time);
 		if (dt < 1) {
 			SEISCOMP_DEBUG(
 				"colliding picks %s and %s",
@@ -581,7 +581,7 @@ Autoloc3::_findMatchingOrigin(const Autoloc::DataModel::Origin *origin) const
 		//
 		// This time difference may be made configurable but this is
 		// not crucial.
-		if (fabs(origin->time - existing->time) > 20*60)
+		if (std::abs(origin->time - existing->time) > 20*60)
 			continue;
 
 		size_t identical=0, similar=0;
@@ -1025,7 +1025,7 @@ Autoloc3::_xxlPreliminaryOrigin(const Autoloc::DataModel::Pick *newPick)
 		double dt = newPick->time - pick->time;
 		double dx = distance(pick->station(), newPick->station());
 
-		if (fabs(dt) > 10+13.7*_config.xxlMaxStaDist)
+		if (std::abs(dt) > 10+13.7*_config.xxlMaxStaDist)
 			continue;
 
 		if ( dx > _config.xxlMaxStaDist )
@@ -1183,7 +1183,7 @@ const Autoloc::DataModel::Pick *Autoloc3::supersedesAnotherPick(const Autoloc::D
 
 		double dt = pick->time - existingPick->time; // TODO: asymmetric
 		double dtmax = 5;  // make configurable
-		if (fabs(dt) < dtmax) {
+		if (std::abs(dt) < dtmax) {
 			// If we already have a pick from that station and if that
 			// pick has a higher priority, we forget our new pick right
 			// here.
@@ -1235,7 +1235,7 @@ Autoloc3::_trySupersede(const Autoloc::DataModel::Pick *pick)
 
 		double dt = pick->time - existingPick->time; // TODO: asymmetric
 		double dtmax = 5;  // make configurable
-		if (fabs(dt) < dtmax) {
+		if (std::abs(dt) < dtmax) {
 			// Have we found a matching origin previously?
 			// That should not be the case. -> Warning!
 			if (associatedOrigin) {
@@ -1263,6 +1263,11 @@ Autoloc3::_trySupersede(const Autoloc::DataModel::Pick *pick)
 
 				if (existingPick->originID()) {
 					const Origin *origin = _origins.find(existingPick->originID());
+					if (origin == nullptr) {
+						THIS_SHOULD_NEVER_HAPPEN;
+						SEISCOMP_ERROR("Origin %ld referenced by pick %s not found", existingPick->originID(), existingPick->id().c_str());
+						continue;
+					}
 SEISCOMP_DEBUG_S(" TMP- " + printOneliner(origin));
 					associatedOrigin =
 						new Origin(*origin);
@@ -1544,8 +1549,8 @@ Autoloc3::_tryNucleate(const Autoloc::DataModel::Pick *pick)
 		OriginPtr temp = merge(bestEquivalentOrigin, newOrigin.get());
 		if (temp) {
 			double epsilon = 1.E-07;
-			if (fabs(temp->rms()-rms)/rms < epsilon &&
-			    fabs(_score(temp.get())-score)/score < epsilon) {
+			if (std::abs(temp->rms()-rms)/rms < epsilon &&
+			    std::abs(_score(temp.get())-score)/score < epsilon) {
 
 				SEISCOMP_DEBUG_S(
 					" MRG " + printOneliner(temp.get()) +
@@ -1728,7 +1733,7 @@ bool Autoloc3::_process(const Autoloc::DataModel::Pick *pick)
 	_origin = _trySupersede(pick);
 	origin = _origin.get();
 	if ( origin ) {
-SEISCOMP_INFO_S("_trySupersede succeeded for pick "+pick->id());
+SEISCOMP_DEBUG_S("_trySupersede succeeded for pick "+pick->id());
 		// TODO: take care of updated origin
 		_rework(origin);
 		if ( _passedFilter(origin) ) {
@@ -1738,7 +1743,7 @@ SEISCOMP_INFO_S("_trySupersede succeeded for pick "+pick->id());
 
 		return true;
 	}
-SEISCOMP_INFO_S("_trySupersede failed for pick "+pick->id()+" which is OK.");
+SEISCOMP_DEBUG_S("_trySupersede failed for pick "+pick->id()+" which is OK.");
 
 	// Try to associate this pick to an existing origin
 	_origin = _tryAssociate(pick);
@@ -3220,7 +3225,7 @@ if (isPKP(phase)) SEISCOMP_DEBUG("_associate PKP?? J");
 			}
 
 			Arrival &arr = relo->arrivals[index];
-			if (fabs(arr.residual) > _config.maxResidualUse) {
+			if (std::abs(arr.residual) > _config.maxResidualUse) {
 				// Added arrival but pick is not used
 				// due to large residual.
 				arr.excluded = Arrival::LargeResidual;
@@ -3654,7 +3659,7 @@ double Autoloc3::_testFake(Autoloc::DataModel::Origin *origin) const
 				if (tt != nullptr && ! arr.pick->xxl && arr.score < 1) {
 					double dt = arr.pick->time - (otherOrigin->time + tt->time);
 					if (dt > -20 && dt < 30) {
-						if (fabs(dt) < fabs(arr.residual))
+						if (std::abs(dt) < std::abs(arr.residual))
 							arr.excluded = Arrival::DeterioratesSolution;
 						SEISCOMP_DEBUG("_testFake: %-6s %5lu %5lu PP   dt=%.1f", sta->code.c_str(),origin->id, otherOrigin->id, dt);
 						count ++;
@@ -3669,7 +3674,7 @@ double Autoloc3::_testFake(Autoloc::DataModel::Origin *origin) const
 				if (tt != nullptr && ! arr.pick->xxl) {
 					double dt = arr.pick->time - (otherOrigin->time + tt->time);
 					if (dt > -20 && dt < 50) { // a bit more generous for PKP
-						if (fabs(dt) < fabs(arr.residual))
+						if (std::abs(dt) < std::abs(arr.residual))
 							arr.excluded = Arrival::DeterioratesSolution;
 						SEISCOMP_DEBUG("_testFake: %-6s %5lu %5lu PKP  dt=%.1f", sta->code.c_str(),origin->id, otherOrigin->id, dt);
 						count ++;
@@ -3685,7 +3690,7 @@ double Autoloc3::_testFake(Autoloc::DataModel::Origin *origin) const
 				if (tt != nullptr && ! arr.pick->xxl) {
 					double dt = arr.pick->time - (otherOrigin->time + tt->time);
 					if (dt > -20 && dt < 50) { // a bit more generous for SKP
-						if (fabs(dt) < fabs(arr.residual))
+						if (std::abs(dt) < std::abs(arr.residual))
 							arr.excluded = Arrival::DeterioratesSolution;
 						SEISCOMP_DEBUG("_testFake: %-6s %5lu %5lu SKP  dt=%.1f", sta->code.c_str(),origin->id, otherOrigin->id, dt);
 						count ++;
@@ -3700,7 +3705,7 @@ double Autoloc3::_testFake(Autoloc::DataModel::Origin *origin) const
 				if (tt != nullptr && ! arr.pick->xxl) {
 					double dt = arr.pick->time - (otherOrigin->time + tt->time);
 					if (dt > -20 && dt < 50) { // a bit more generous for PKKP
-						if (fabs(dt) < fabs(arr.residual))
+						if (std::abs(dt) < std::abs(arr.residual))
 							arr.excluded = Arrival::DeterioratesSolution;
 						SEISCOMP_DEBUG("_testFake: %-6s %5lu %5lu PKKP dt=%.1f", sta->code.c_str(),origin->id, otherOrigin->id, dt);
 						count ++;
@@ -3715,7 +3720,7 @@ double Autoloc3::_testFake(Autoloc::DataModel::Origin *origin) const
 				if (tt) {
 					double dt = arr.pick->time - (otherOrigin->time + tt->time);
 					if (dt > -20 && dt < 30) {
-						if (fabs(dt) < fabs(arr.residual))
+						if (std::abs(dt) < std::abs(arr.residual))
 							arr.excluded = Arrival::DeterioratesSolution;
 						SEISCOMP_DEBUG("_testFake: %-6s %5lu %5lu pP   dt=%.1f", sta->code.c_str(),origin->id, otherOrigin->id, dt);
 						count ++;
@@ -3728,7 +3733,7 @@ double Autoloc3::_testFake(Autoloc::DataModel::Origin *origin) const
 				if (tt) {
 					double dt = arr.pick->time - (otherOrigin->time + tt->time);
 					if (dt > -20 && dt < 30) {
-						if (fabs(dt) < fabs(arr.residual))
+						if (std::abs(dt) < std::abs(arr.residual))
 							arr.excluded = Arrival::DeterioratesSolution;
 						SEISCOMP_DEBUG("_testFake: %-6s %5lu %5lu sP   dt=%.1f", sta->code.c_str(),origin->id, otherOrigin->id, dt);
 						count ++;
@@ -3743,7 +3748,7 @@ double Autoloc3::_testFake(Autoloc::DataModel::Origin *origin) const
 				if (tt != nullptr && ! arr.pick->xxl && arr.score < 1) {
 					double dt = arr.pick->time - (otherOrigin->time + tt->time);
 					if (dt > -20 && dt < 30) {
-						if (fabs(dt) < fabs(arr.residual))
+						if (std::abs(dt) < std::abs(arr.residual))
 							arr.excluded = Arrival::DeterioratesSolution;
 						SEISCOMP_DEBUG("_testFake: %-6s %5lu %5lu S    dt=%.1f", sta->code.c_str(),origin->id, otherOrigin->id, dt);
 						count ++;
@@ -3807,7 +3812,7 @@ int Autoloc3::_removeWorstOutliers(Autoloc::DataModel::Origin *origin)
 		Arrival &arr = *it;
 
 		if (arr.excluded &&
-		    fabs(arr.residual) > _config.maxResidualKeep) {
+		    std::abs(arr.residual) > _config.maxResidualKeep) {
 
 			arr.pick->setOriginID(0); // disassociate the pick
 			removed.push_back(arr.pick->id());
@@ -3921,16 +3926,16 @@ bool Autoloc3::_trimResiduals(Autoloc::DataModel::Origin *origin)
 
 			// If the residual is bad, keep track of the
 			// worst residual
-			if (fabs(normalizedResidual) > maxResidual) {
+			if (std::abs(normalizedResidual) > maxResidual) {
 				maxIndex = i;
-				maxResidual = fabs(normalizedResidual);
+				maxResidual = std::abs(normalizedResidual);
 			}
 		}
 
 		if (maxIndex == -1)
 			break;
 
-		if (fabs(maxResidual) < 1)
+		if (std::abs(maxResidual) < 1)
 			break;
 
 		OriginPtr copy = new Origin(*origin);
@@ -3962,9 +3967,9 @@ bool Autoloc3::_trimResiduals(Autoloc::DataModel::Origin *origin)
 			if (arr.excluded != Arrival::LargeResidual)
 				continue;
 
-			if (fabs(arr.residual) < minResidual) {
+			if (std::abs(arr.residual) < minResidual) {
 				minIndex = i;
-				minResidual = fabs(arr.residual);
+				minResidual = std::abs(arr.residual);
 			}
 		}
 

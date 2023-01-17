@@ -81,8 +81,10 @@ void delazi(double lat1, double lon1, double lat2, double lon2,
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-void delazi(const Autoloc::DataModel::Hypocenter *hypo, const Autoloc::DataModel::Station *station,
-            double &delta, double &az1, double &az2)
+void delazi(
+	const Autoloc::DataModel::Hypocenter *hypo,
+	const Autoloc::DataModel::Station *station,
+	double &delta, double &az1, double &az2)
 {
 	Seiscomp::Math::Geo::delazi(
 		hypo->lat,    hypo->lon,
@@ -216,7 +218,7 @@ double meandev(const Autoloc::DataModel::Origin* origin)
 		const Autoloc::DataModel::Arrival &arr = origin->arrivals[i];
 		if (arr.excluded)
 			continue;
-		cumresid  += fabs(arr.residual);
+		cumresid  += std::abs(arr.residual);
 		cumweight += 1;
 	}
 
@@ -296,8 +298,6 @@ std::string printOrigin(
 			origin->rms(), origin->definingPhaseCount(),
 			(unsigned long)origin->arrivals.size(),score);
 		out << s;
-// TEMP
-out << (origin->locked ? " locked=yes" : " locked=no ");
 	}
 	else {
 		out << "Detailed info for Origin " << origin->id << std::endl
@@ -360,7 +360,7 @@ out << (origin->locked ? " locked=yes" : " locked=no ");
 		out << "SGAP  = " << origin->quality.aziGapSecondary << std::endl;
 		out << "SCORE = " << originScore(origin) << std::endl;
 		out << "preliminary = "  << (origin->preliminary ? "true":"false") << std::endl;
-		out << "locked = "  << (origin->locked ? "true":"false") << std::endl;
+		out << "locked = "  << (origin->locked ? "true" : "false") << std::endl;
 
 		out.precision(precision);
 	}
@@ -731,7 +731,7 @@ int arrivalWithLargestResidual(const Autoloc::DataModel::Origin *origin)
 
 		if (arr.excluded)
 			continue;
-		double absres = fabs(arr.residual);
+		double absres = std::abs(arr.residual);
 		if (absres > resmax) {
 			resmax = absres;
 			imax = i;

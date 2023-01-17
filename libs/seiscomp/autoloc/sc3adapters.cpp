@@ -73,7 +73,7 @@ Seiscomp::DataModel::Origin *exportToSC(
 		Seiscomp::DataModel::EvaluationMode(
 			Seiscomp::DataModel::AUTOMATIC));
 
-	if ( origin->preliminary )
+// TEMP	if ( origin->preliminary )
 		scorigin->setEvaluationStatus(
 			Seiscomp::DataModel::EvaluationStatus(
 				Seiscomp::DataModel::PRELIMINARY));
@@ -114,7 +114,7 @@ Seiscomp::DataModel::Origin *exportToSC(
 		// Don't include arrivals with huge residuals as (unless by
 		// accident) these are excluded from the location anyway.
 
-		// if (arr.excluded && fabs(arr.residual) > 30.) {
+		// if (arr.excluded && std::abs(arr.residual) > 30.) {
 		// 	// FIXME: quick+dirty fix
 		// 	SEISCOMP_DEBUG_S("SKIPPING 1  "+arr.pick->id());
 		// 	continue;
