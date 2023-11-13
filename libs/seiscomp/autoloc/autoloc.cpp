@@ -1859,16 +1859,31 @@ Autoloc::DataModel::OriginID Autoloc3::_findMatchingOriginViaPicks(const Autoloc
 	std::map<OriginID, size_t> associationCount;
 	for (const Association &asso: associations) {
 		const Pick *pick = asso.pick.get();
+
+		bool trackedPick = false;
+
+		if (trackedPick) {
+			SEISCOMP_DEBUG("Autoloc3::_findMatchingOriginViaPicks()");
+		}
+
 SEISCOMP_DEBUG_S("Autoloc3::_findMatchingOriginViaPicks A "+pick->id());
 
 		// We may also want to associate disabled stations
 		// to *imported* origins (and from there on).
-		if ( ! pick->station()->enabled && ! considerDisabledStations)
+		if ( ! pick->station()->enabled && ! considerDisabledStations) {
+			if (trackedPick) {
+				SEISCOMP_DEBUG("Pick %s ignored because station is disabled", pick->id().c_str());
+			}
 			continue;
+		}
 SEISCOMP_DEBUG_S("Autoloc3::_findMatchingOriginViaPicks B "+pick->id());
 
-		if (pick->priority <= 0)
+		if (pick->priority <= 0) {
+			if (trackedPick) {
+				SEISCOMP_DEBUG("Pick %s ignored because priority < 0", pick->id().c_str());
+			}
 			continue;
+		}
 SEISCOMP_DEBUG_S("Autoloc3::_findMatchingOriginViaPicks C "+pick->id());
 
 		const Origin* other = _origins.find(pick->originID());
@@ -2075,10 +2090,12 @@ bool Autoloc3::_processImportedOrigin(Autoloc::DataModel::Origin *importedOrigin
 bool Autoloc3::_processManualOrigin(Autoloc::DataModel::Origin *origin)
 {
 	using namespace Autoloc::DataModel;
+
 	const Origin *manualOrigin = origin;
 
 	if ( manualOrigin->arrivals.empty() ) {
 		SEISCOMP_WARNING("Ignoring manual origin without arrivals");
+		// TODO: Proceed like with an imported origin
 		return false;
 	}
 
@@ -2086,14 +2103,23 @@ bool Autoloc3::_processManualOrigin(Autoloc::DataModel::Origin *origin)
 		"processing manual origin z=%.3fkm   dtype=%d",
 		manualOrigin->dep, manualOrigin->depthType);
 
-	// Look for a matching (autoloc) origin. Our intention is to find the
-	// best-matching origin and merge it with the just received manual
-	// origin (adopt picks, fixed focal depth etc.)
+	// Look for an existing (autoloc) origin that matches the just-received manual origin.
+	// The match will never be perfect and often only rough, as the existing origin may be
+	// wrongly located (e.g. depth).
+	//
+	// Our intention is to find the best-matching, existing origin and merge it with the
+	// just-received manual origin (adopt picks, fixed focal depth etc.).
+	//
+	// In this merge the manual origin will be "ground truth" in terms of location/time,
+	// and we will adopt arrivals from the existing origin based on how they agree with
+	// the manual origin.
 
 	// FIXME: Only origins in memory are found, but not origins in database!
 	OriginID id = _findMatchingOrigin(manualOrigin);
+	SEISCOMP_DEBUG("found matching origin with id=%ld", id);
 
-	Origin *found = nullptr;
+	// Get the origin instance from the id
+	Origin *found = _origins.find(id);
 
 	if (found) {
 		SEISCOMP_DEBUG(
@@ -2187,6 +2213,9 @@ bool Autoloc3::_processManualOrigin(Autoloc::DataModel::Origin *origin)
 			const char *phc = a.phase.c_str();
 			SEISCOMP_INFO("ASSO %5s %5s  %6.2f", sta, phc, a.residual);
 		}
+
+		// TODO!
+
 		return true;
 	}
 
@@ -2202,6 +2231,8 @@ bool Autoloc3::_processQualifiedOrigin(Autoloc::DataModel::Origin *origin)
 {
 	using namespace Autoloc::DataModel;
 	const Origin *qualifiedOrigin = origin;
+
+	// TODO
 
 	return true;
 }
@@ -2954,6 +2985,7 @@ bool Autoloc3::_associate(
 	const std::string &phase)
 {
 	using namespace Autoloc::DataModel;
+
 if (isPKP(phase)) SEISCOMP_DEBUG("_associate PKP?? A");
 
 	const std::string &pickID = pick->id();

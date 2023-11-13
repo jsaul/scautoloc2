@@ -33,6 +33,12 @@ class StationConfigItem {
 		maxNucDist = maxLocDist = 0;
 		usage = 0;
 	}
+
+	StationConfigItem(const StationConfigItem &other) {
+		maxNucDist = other.maxNucDist;
+		maxLocDist = other.maxLocDist;
+		usage = other.usage;
+	}
 };
 
 

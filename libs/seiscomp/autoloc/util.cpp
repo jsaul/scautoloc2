@@ -500,11 +500,7 @@ double originScore(
 				"THIS SHOULD NEVER HAPPEN: "
 				"pick %s with  normamp %g  amp %g "
 				"(not critical)",
-<<<<<<< HEAD
 				pick->id().c_str(), normamp, pick->amp);
-=======
-				pick->id.c_str(), normamp, pick->amp);
->>>>>>> 15727c9 (cosmetics)
 			continue;
 		}
 

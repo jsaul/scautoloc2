@@ -18,6 +18,7 @@
 #include <seiscomp/autoloc/util.h>
 #include <seiscomp/autoloc/sc3adapters.h>
 #include <seiscomp/logging/log.h>
+#include <sstream>
 
 
 namespace Seiscomp {
@@ -43,11 +44,23 @@ bool Autoloc3::_report(const Autoloc::DataModel::Origin *origin)
 	Seiscomp::DataModel::OriginPtr scorigin =
 		Autoloc::exportToSC(origin, _config.reportAllPhases);
 
-	Seiscomp::DataModel::CreationInfo ci;
-	ci.setAgencyID(_config.agencyID);
-	ci.setAuthor(_config.author);
-	ci.setCreationTime(now());
-	scorigin->setCreationInfo(ci);
+	Seiscomp::Core::Time creationTime = now();
+
+	if (_config.offline || _config.test) {
+		// Create a publicID from the creation time and the internal
+		// origin ID. This is useful for debugging using playbacks.
+		std::ostringstream ss;
+		ss << "Origin";
+		ss << "-" << creationTime.toString("%Y%m%d%H%M%S.%6f");
+		ss << "-" << origin->id;
+		scorigin->setPublicID(ss.str());
+	}
+
+	Seiscomp::DataModel::CreationInfo creationInfo;
+	creationInfo.setAgencyID(_config.agencyID);
+	creationInfo.setAuthor(_config.author);
+	creationInfo.setCreationTime(creationTime);
+	scorigin->setCreationInfo(creationInfo);
 
 	SEISCOMP_DEBUG ("Reporting origin:");
 	SEISCOMP_DEBUG_S(printDetailed(origin));

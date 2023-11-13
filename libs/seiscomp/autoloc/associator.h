@@ -91,7 +91,12 @@ class Associator
 		// For a pick find all matching origins.
 		//
 		// The matches are appended as Associations to the
-		// AssociationVector. The pick itself is not modified.
+		// AssociationVector.
+		//
+		// In case of a pick previously associated to an origin,
+		// that association is also part of the result.
+		//
+		// Neither the pick itself not any origins are modified.
 		bool findMatchingOrigins(
 			const Autoloc::DataModel::Pick*,
 			AssociationVector &associations) const;
